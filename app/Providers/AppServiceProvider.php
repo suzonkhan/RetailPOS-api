@@ -6,6 +6,7 @@ use App\Contracts\BkashGateway;
 use App\Services\Bkash\MockBkashGateway;
 use App\Services\Bkash\SandboxBkashGateway;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -31,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Schema::defaultStringLength(191);
         JsonResource::withoutWrapping();
     }
 }
