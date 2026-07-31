@@ -17,6 +17,14 @@ class ProductResource extends JsonResource
             'id' => $this->id,
             'uuid' => $this->uuid,
             'name' => $this->name,
+            'image_url' => $this->whenLoaded(
+                'primaryImage',
+                fn () => $this->primaryImage?->url()
+            ),
+            'primary_image_id' => $this->whenLoaded(
+                'primaryImage',
+                fn () => $this->primaryImage?->id
+            ),
             'sku' => $this->sku,
             'barcode' => $this->barcode,
             'description' => $this->description,

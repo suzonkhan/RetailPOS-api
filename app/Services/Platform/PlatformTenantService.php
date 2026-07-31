@@ -5,6 +5,7 @@ namespace App\Services\Platform;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Auth\RegistrationService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -54,6 +55,29 @@ class PlatformTenantService
             ->where('is_platform_admin', false)
             ->orderBy('id')
             ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function create(array $data): Tenant
+    {
+        $user = app(RegistrationService::class)->register($data);
+
+        return $user->tenant->fresh(['plan', 'store']);
+    }
+
+    public function resetOwnerPin(Tenant $tenant, string $pin): User
+    {
+        $owner = $this->findOwner($tenant);
+
+        if ($owner === null) {
+            abort(404, 'Tenant owner not found.');
+        }
+
+        $owner->update(['pin_hash' => $pin]);
+
+        return $owner->fresh();
     }
 
     /**

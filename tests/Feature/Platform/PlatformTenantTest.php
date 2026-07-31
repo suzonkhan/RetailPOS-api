@@ -184,6 +184,47 @@ class PlatformTenantTest extends TestCase
             ->assertJsonValidationErrors(['body']);
     }
 
+    public function test_super_admin_can_create_tenant(): void
+    {
+        $admin = $this->createSuperAdmin('8801711111120');
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/v1/platform/tenants', [
+            'shop_name' => 'New Platform Shop',
+            'owner_name' => 'New Owner',
+            'mobile' => '8801712345610',
+            'pin' => '654321',
+            'plan_slug' => 'startup-plus',
+        ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('name', 'New Platform Shop')
+            ->assertJsonPath('owner.mobile', '8801712345610')
+            ->assertJsonPath('plan.slug', 'startup-plus');
+
+        $this->assertDatabaseHas('users', [
+            'mobile' => '8801712345610',
+        ]);
+    }
+
+    public function test_super_admin_can_reset_owner_pin(): void
+    {
+        $owner = $this->registerOwner('8801712345611');
+        $admin = $this->createSuperAdmin('8801711111121');
+
+        Sanctum::actingAs($admin);
+
+        $this->patchJson('/api/v1/platform/tenants/'.$owner->tenant_id.'/owner-pin', [
+            'pin' => '999999',
+        ])->assertOk();
+
+        $this->postJson('/api/v1/auth/login', [
+            'mobile' => '8801712345611',
+            'pin' => '999999',
+        ])->assertOk();
+    }
+
     private function registerOwner(string $mobile = '8801712345699'): User
     {
         $this->postJson('/api/v1/auth/register', [

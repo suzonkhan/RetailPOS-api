@@ -16,22 +16,27 @@ class RegistrationService
     public function register(array $data): User
     {
         return DB::transaction(function () use ($data) {
+            $shopName = trim((string) ($data['shop_name'] ?? ''));
+            if ($shopName === '') {
+                $shopName = $data['owner_name'];
+            }
+
             $plan = Plan::query()
                 ->where('slug', $data['plan_slug'] ?? 'startup')
                 ->where('is_active', true)
                 ->firstOrFail();
 
             $tenant = Tenant::query()->create([
-                'name' => $data['shop_name'],
-                'slug' => $this->uniqueTenantSlug($data['shop_name']),
+                'name' => $shopName,
+                'slug' => $this->uniqueTenantSlug($shopName),
                 'plan_id' => $plan->id,
                 'status' => Tenant::STATUS_TRIAL,
-                'trial_ends_at' => now()->addDays(7),
+                'trial_ends_at' => now()->addDays((int) config('retail360.trial_days', 15)),
             ]);
 
             $store = Store::query()->create([
                 'tenant_id' => $tenant->id,
-                'name' => $data['store_name'] ?? $data['shop_name'],
+                'name' => $data['store_name'] ?? $shopName,
             ]);
 
             StoreSetting::query()->create([

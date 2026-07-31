@@ -45,6 +45,7 @@ class RolePermissionSeeder extends Seeder
         ],
         'super_admin' => [
             'platform.tenants',
+            'platform.plans',
             'platform.coupons',
         ],
     ];

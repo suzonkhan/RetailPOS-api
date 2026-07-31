@@ -26,6 +26,7 @@ class Tenant extends Model
         'subscribed_at',
         'current_period_ends_at',
         'billing_cycle',
+        'last_order_number',
     ];
 
     protected function casts(): array

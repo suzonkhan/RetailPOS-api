@@ -21,6 +21,7 @@ class Sale extends Model
     protected $fillable = [
         'uuid',
         'client_uuid',
+        'order_number',
         'tenant_id',
         'store_id',
         'customer_id',
@@ -28,7 +29,9 @@ class Sale extends Model
         'updated_by',
         'subtotal',
         'vat_total',
+        'discount_amount',
         'total',
+        'change_amount',
         'status',
     ];
 
@@ -37,7 +40,9 @@ class Sale extends Model
         return [
             'subtotal' => 'decimal:2',
             'vat_total' => 'decimal:2',
+            'discount_amount' => 'decimal:2',
             'total' => 'decimal:2',
+            'change_amount' => 'decimal:2',
         ];
     }
 

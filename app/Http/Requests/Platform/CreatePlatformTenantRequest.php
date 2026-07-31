@@ -1,12 +1,12 @@
 <?php
 
-namespace App\Http\Requests\Auth;
+namespace App\Http\Requests\Platform;
 
 use App\Support\MobileNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class RegisterRequest extends FormRequest
+class CreatePlatformTenantRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -25,7 +25,7 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'shop_name' => ['nullable', 'string', 'max:255'],
+            'shop_name' => ['required', 'string', 'max:255'],
             'store_name' => ['nullable', 'string', 'max:255'],
             'owner_name' => ['required', 'string', 'max:255'],
             'mobile' => [

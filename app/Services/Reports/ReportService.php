@@ -28,6 +28,7 @@ class ReportService
 
         $grossRevenue = (float) (clone $sales)->sum('total');
         $vatTotal = (float) (clone $sales)->sum('vat_total');
+        $discountsTotal = (float) (clone $sales)->sum('discount_amount');
         $saleCount = (int) (clone $sales)->count();
 
         $returnsTotal = $this->returnsTotalInRange($store, $from, $to);
@@ -41,7 +42,7 @@ class ReportService
             'sale_count' => $saleCount,
             'gross_revenue' => round($grossRevenue, 2),
             'vat_total' => round($vatTotal, 2),
-            'discounts_total' => 0.0,
+            'discounts_total' => round($discountsTotal, 2),
             'returns_total' => round($returnsTotal, 2),
             'net_revenue' => $netRevenue,
             'average_order_value' => $saleCount > 0 ? round($netRevenue / $saleCount, 2) : 0.0,
@@ -338,7 +339,7 @@ class ReportService
                 'cashier' => $sale->user?->name,
                 'items_sold' => (int) $sale->items->sum('quantity'),
                 'payment_methods' => $paymentNames,
-                'discount' => 0.0,
+                'discount' => round((float) ($sale->discount_amount ?? 0), 2),
                 'grand_total' => round((float) $sale->total, 2),
                 'items' => $sale->items->map(fn (SaleItem $item) => [
                     'product_name' => $item->product_name,

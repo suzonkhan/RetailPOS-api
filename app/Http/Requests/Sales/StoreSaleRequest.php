@@ -26,6 +26,8 @@ class StoreSaleRequest extends FormRequest
             'payments.*.payment_method_id' => ['required', 'integer', Rule::exists('payment_methods', 'id')->where('tenant_id', $this->user()->tenant_id)],
             'payments.*.amount' => ['required', 'numeric', 'min:0.01'],
             'payments.*.reference' => ['nullable', 'string', 'max:255'],
+            'change_amount' => ['sometimes', 'numeric', 'min:0'],
+            'discount_amount' => ['sometimes', 'numeric', 'min:0'],
         ];
     }
 }

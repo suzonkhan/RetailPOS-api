@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Platform;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Platform\CreatePlatformTenantRequest;
+use App\Http\Requests\Platform\ResetOwnerPinRequest;
 use App\Http\Requests\Platform\UpdatePlatformTenantRequest;
 use App\Http\Resources\Platform\PlatformTenantDetailResource;
 use App\Http\Resources\Platform\PlatformTenantListResource;
@@ -33,6 +35,16 @@ class PlatformTenantController extends Controller
         ]);
     }
 
+    public function store(CreatePlatformTenantRequest $request): JsonResponse
+    {
+        $tenant = $this->platformTenants->create($request->validated());
+        $tenant->load(['plan', 'store']);
+
+        return PlatformTenantDetailResource::make($tenant)
+            ->response()
+            ->setStatusCode(201);
+    }
+
     public function show(Tenant $tenant): PlatformTenantDetailResource
     {
         $tenant->load(['plan', 'store']);
@@ -43,6 +55,17 @@ class PlatformTenantController extends Controller
     public function update(UpdatePlatformTenantRequest $request, Tenant $tenant): JsonResponse
     {
         $tenant = $this->platformTenants->update($tenant, $request->validated());
+
+        return PlatformTenantDetailResource::make($tenant)
+            ->response()
+            ->setStatusCode(200);
+    }
+
+    public function resetOwnerPin(ResetOwnerPinRequest $request, Tenant $tenant): JsonResponse
+    {
+        $this->platformTenants->resetOwnerPin($tenant, $request->validated('pin'));
+
+        $tenant->load(['plan', 'store']);
 
         return PlatformTenantDetailResource::make($tenant)
             ->response()

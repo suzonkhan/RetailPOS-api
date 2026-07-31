@@ -195,6 +195,8 @@ class SyncPushService
             'customer_id' => $this->resolver->resolveCustomerId($store, $saleData),
             'items' => $items,
             'payments' => $payments,
+            'change_amount' => $saleData['change_amount'] ?? 0,
+            'discount_amount' => $saleData['discount_amount'] ?? 0,
         ];
     }
 

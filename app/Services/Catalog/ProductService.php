@@ -21,7 +21,7 @@ class ProductService
 
         $query = Product::query()
             ->where('store_id', $store->id)
-            ->with(['category', 'supplier', 'brand'])
+            ->with(['category', 'supplier', 'brand', 'primaryImage'])
             ->withCount([
                 'variants as active_variants_count' => fn ($q) => $q->where('is_active', true),
             ]);

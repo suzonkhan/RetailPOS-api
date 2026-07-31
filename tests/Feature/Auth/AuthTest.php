@@ -24,32 +24,46 @@ class AuthTest extends TestCase
         ]);
     }
 
-    public function test_register_creates_tenant_with_seven_day_trial(): void
+    public function test_register_creates_tenant_with_fifteen_day_startup_trial(): void
     {
         $response = $this->postJson('/api/v1/auth/register', [
-            'shop_name' => 'Demo Shop',
             'owner_name' => 'Owner One',
             'mobile' => '01712345678',
             'pin' => '123456',
-            'plan_slug' => 'startup',
         ]);
 
         $response->assertCreated()
             ->assertJsonPath('user.mobile', '8801712345678')
             ->assertJsonPath('role', 'owner')
             ->assertJsonPath('subscription.is_trial', true)
-            ->assertJsonPath('subscription.trial_days_remaining', 7)
+            ->assertJsonPath('subscription.trial_days_remaining', 15)
             ->assertJsonPath('subscription.plan.slug', 'startup')
             ->assertJsonStructure(['token', 'permissions', 'tenant', 'store']);
 
         $this->assertDatabaseHas('tenants', [
-            'name' => 'Demo Shop',
+            'name' => 'Owner One',
             'status' => Tenant::STATUS_TRIAL,
         ]);
 
         $tenant = Tenant::query()->first();
         $this->assertNotNull($tenant->trial_ends_at);
-        $this->assertTrue($tenant->trial_ends_at->greaterThan(now()->addDays(6)));
+        $this->assertTrue($tenant->trial_ends_at->greaterThan(now()->addDays(14)));
+    }
+
+    public function test_register_accepts_optional_shop_name(): void
+    {
+        $response = $this->postJson('/api/v1/auth/register', [
+            'shop_name' => 'Demo Shop',
+            'owner_name' => 'Owner One',
+            'mobile' => '01712345679',
+            'pin' => '123456',
+        ]);
+
+        $response->assertCreated();
+
+        $this->assertDatabaseHas('tenants', [
+            'name' => 'Demo Shop',
+        ]);
     }
 
     public function test_login_with_mobile_and_pin(): void

@@ -171,6 +171,7 @@ class SalesTest extends TestCase
                 ['payment_method_id' => $bkashId, 'amount' => 100, 'reference' => 'TRX123'],
             ],
         ])->assertCreated()
+            ->assertJsonPath('order_number', 1)
             ->assertJsonPath('subtotal', 200)
             ->assertJsonPath('vat_total', 10)
             ->assertJsonPath('total', 210);
@@ -196,6 +197,69 @@ class SalesTest extends TestCase
             'type' => 'sale',
             'quantity_delta' => -2,
         ]);
+    }
+
+    public function test_sale_with_discount_amount_reduces_total(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 100,
+            'stock_quantity' => 10,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+
+        $cashId = $this->createPaymentMethod('Cash');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 2],
+            ],
+            'discount_amount' => 25,
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 175],
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('subtotal', 200)
+            ->assertJsonPath('vat_total', 0)
+            ->assertJsonPath('discount_amount', 25)
+            ->assertJsonPath('total', 175);
+
+        $this->assertDatabaseHas('sales', [
+            'subtotal' => 200,
+            'discount_amount' => 25,
+            'total' => 175,
+        ]);
+    }
+
+    public function test_sale_rejects_discount_above_total(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 50,
+            'stock_quantity' => 5,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+
+        $cashId = $this->createPaymentMethod('Cash');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 1],
+            ],
+            'discount_amount' => 60,
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 50],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['discount_amount']);
     }
 
     public function test_sale_with_credit_payment_creates_customer_due(): void
@@ -565,6 +629,37 @@ class SalesTest extends TestCase
         ]);
     }
 
+    public function test_cash_sale_stores_change_amount(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 100,
+            'stock_quantity' => 5,
+        ]);
+
+        $cashId = $this->createPaymentMethod('Cash');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 100],
+            ],
+            'change_amount' => 50,
+        ])->assertCreated()
+            ->assertJsonPath('total', 100)
+            ->assertJsonPath('change_amount', 50);
+
+        $this->assertDatabaseHas('sales', [
+            'total' => 100,
+            'change_amount' => 50,
+        ]);
+    }
+
     public function test_credit_sale_requires_customer(): void
     {
         Sanctum::actingAs($this->owner);
@@ -771,6 +866,92 @@ class SalesTest extends TestCase
             ->assertJsonPath('total', 50);
     }
 
+    public function test_tenant_order_numbers_start_at_one_and_increment(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 50,
+            'stock_quantity' => 10,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+        $cashId = $this->createPaymentMethod('Cash');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 50],
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('order_number', 1);
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 50],
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('order_number', 2);
+
+        $this->assertEquals(2, $this->owner->tenant->fresh()->last_order_number);
+    }
+
+    public function test_order_numbers_are_isolated_per_tenant(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 50,
+            'stock_quantity' => 10,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+        $cashId = $this->createPaymentMethod('Cash');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 50],
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('order_number', 1);
+
+        $otherOwner = $this->registerOtherOwner('8801712345924');
+        Sanctum::actingAs($otherOwner);
+
+        $otherCategoryId = $this->createCategoryAs($otherOwner);
+        $otherProductId = $this->createProductAs($otherOwner, $otherCategoryId, [
+            'selling_price' => 50,
+            'stock_quantity' => 10,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+        $otherCashId = $this->createPaymentMethodAs($otherOwner, 'Cash');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $otherProductId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $otherCashId, 'amount' => 50],
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('order_number', 1);
+    }
+
     public function test_sales_list_supports_filters(): void
     {
         Sanctum::actingAs($this->owner);
@@ -787,7 +968,7 @@ class SalesTest extends TestCase
         $dueMethodId = $this->createPaymentMethod('Due', isCredit: true);
         $cashier = $this->createTenantUser('cashier');
 
-        $paidSaleId = $this->postJson('/api/v1/sales', [
+        $paidSaleResponse = $this->postJson('/api/v1/sales', [
             'client_uuid' => (string) Str::uuid(),
             'customer_id' => $customerId,
             'items' => [
@@ -796,7 +977,10 @@ class SalesTest extends TestCase
             'payments' => [
                 ['payment_method_id' => $cashId, 'amount' => 100],
             ],
-        ])->assertCreated()->json('id');
+        ])->assertCreated();
+
+        $paidSaleId = $paidSaleResponse->json('id');
+        $paidOrderNumber = $paidSaleResponse->json('order_number');
 
         Sanctum::actingAs($cashier);
         $dueSaleId = $this->postJson('/api/v1/sales', [
@@ -812,10 +996,11 @@ class SalesTest extends TestCase
 
         Sanctum::actingAs($this->owner);
 
-        $this->getJson("/api/v1/sales?order_id={$paidSaleId}")
+        $this->getJson("/api/v1/sales?order_id={$paidOrderNumber}")
             ->assertOk()
             ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.id', $paidSaleId);
+            ->assertJsonPath('data.0.id', $paidSaleId)
+            ->assertJsonPath('data.0.order_number', $paidOrderNumber);
 
         $this->getJson("/api/v1/sales?user_id={$cashier->id}")
             ->assertOk()
@@ -864,9 +1049,9 @@ class SalesTest extends TestCase
             ->json('id');
     }
 
-    private function createProduct(int $categoryId, array $extra = []): int
+    private function createProductAs(User $user, int $categoryId, array $extra = []): int
     {
-        Sanctum::actingAs($this->owner);
+        Sanctum::actingAs($user);
 
         $stockQuantity = $extra['stock_quantity'] ?? null;
         $expirationDate = $extra['expiration_date'] ?? null;
@@ -899,9 +1084,9 @@ class SalesTest extends TestCase
         return $productId;
     }
 
-    private function createPaymentMethod(string $name, bool $requiresReference = false, bool $isCredit = false): int
+    private function createPaymentMethodAs(User $user, string $name, bool $requiresReference = false, bool $isCredit = false): int
     {
-        Sanctum::actingAs($this->owner);
+        Sanctum::actingAs($user);
 
         return (int) $this->postJson('/api/v1/payment-methods', [
             'name' => $name.' '.Str::random(4),
@@ -909,6 +1094,16 @@ class SalesTest extends TestCase
             'is_credit' => $isCredit,
         ])->assertCreated()
             ->json('id');
+    }
+
+    private function createProduct(int $categoryId, array $extra = []): int
+    {
+        return $this->createProductAs($this->owner, $categoryId, $extra);
+    }
+
+    private function createPaymentMethod(string $name, bool $requiresReference = false, bool $isCredit = false): int
+    {
+        return $this->createPaymentMethodAs($this->owner, $name, $requiresReference, $isCredit);
     }
 
     private function createCustomer(array $extra = []): int

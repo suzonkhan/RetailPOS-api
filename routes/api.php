@@ -32,6 +32,8 @@ use App\Http\Controllers\Api\V1\SaleReturnController;
 use App\Http\Controllers\Api\V1\TenantSettingsController;
 use App\Http\Controllers\Api\V1\TenantSubscriptionController;
 use App\Http\Controllers\Api\V1\TenantUsageController;
+use App\Http\Controllers\Api\V1\Platform\PlatformCouponController;
+use App\Http\Controllers\Api\V1\Platform\PlatformPlanController;
 use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
@@ -166,8 +168,23 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'platform.admin'])->prefix('platform')->group(function () {
         Route::middleware('permission:platform.tenants')->group(function () {
             Route::get('/tenants', [PlatformTenantController::class, 'index']);
+            Route::post('/tenants', [PlatformTenantController::class, 'store']);
             Route::get('/tenants/{tenant}', [PlatformTenantController::class, 'show']);
             Route::patch('/tenants/{tenant}', [PlatformTenantController::class, 'update']);
+            Route::patch('/tenants/{tenant}/owner-pin', [PlatformTenantController::class, 'resetOwnerPin']);
+        });
+
+        Route::middleware('permission:platform.plans')->group(function () {
+            Route::get('/plans', [PlatformPlanController::class, 'index']);
+            Route::post('/plans', [PlatformPlanController::class, 'store']);
+            Route::get('/plans/{plan}', [PlatformPlanController::class, 'show']);
+            Route::patch('/plans/{plan}', [PlatformPlanController::class, 'update']);
+        });
+
+        Route::middleware('permission:platform.coupons')->group(function () {
+            Route::get('/coupons', [PlatformCouponController::class, 'index']);
+            Route::post('/coupons', [PlatformCouponController::class, 'store']);
+            Route::patch('/coupons/{coupon}', [PlatformCouponController::class, 'update']);
         });
     });
 });

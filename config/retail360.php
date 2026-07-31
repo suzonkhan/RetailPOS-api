@@ -2,6 +2,8 @@
 
 return [
 
+    'trial_days' => (int) env('RETAIL360_TRIAL_DAYS', 15),
+
     'pin_lockout' => [
         'max_attempts' => (int) env('PIN_LOCKOUT_MAX_ATTEMPTS', 5),
         'lockout_minutes' => (int) env('PIN_LOCKOUT_MINUTES', 15),

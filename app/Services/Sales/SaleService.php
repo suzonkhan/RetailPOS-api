@@ -11,6 +11,7 @@ use App\Models\SaleItem;
 use App\Models\SalePayment;
 use App\Models\StockMovement;
 use App\Models\StoreSetting;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Inventory\LotService;
 use App\Services\Catalog\ProductVariantService;
@@ -73,7 +74,7 @@ class SaleService
 
         $orderId = $filters['order_id'] ?? $filters['id'] ?? null;
         if ($orderId !== null && $orderId !== '') {
-            $query->where('id', (int) $orderId);
+            $query->where('order_number', (int) $orderId);
         }
 
         if (! empty($filters['user_id'])) {
@@ -243,6 +244,17 @@ class SaleService
         $vatTotal = round($vatTotal, 2);
         $total = round($total, 2);
 
+        $grossTotal = $total;
+        $discountAmount = round((float) ($data['discount_amount'] ?? 0), 2);
+
+        if ($discountAmount > $grossTotal + 0.01) {
+            throw ValidationException::withMessages([
+                'discount_amount' => ["Discount ({$discountAmount}) cannot exceed sale total ({$grossTotal})."],
+            ]);
+        }
+
+        $total = round(max(0, $grossTotal - $discountAmount), 2);
+
         $paymentsTotal = round(collect($data['payments'])->sum('amount'), 2);
 
         if (abs($paymentsTotal - $total) > 0.01) {
@@ -283,6 +295,7 @@ class SaleService
 
         $sale = Sale::query()->create([
             'client_uuid' => $data['client_uuid'],
+            'order_number' => $this->nextOrderNumber($user->tenant_id),
             'tenant_id' => $user->tenant_id,
             'store_id' => $store->id,
             'customer_id' => $customerId,
@@ -290,7 +303,9 @@ class SaleService
             'updated_by' => $user->id,
             'subtotal' => $subtotal,
             'vat_total' => $vatTotal,
+            'discount_amount' => $discountAmount,
             'total' => $total,
+            'change_amount' => round((float) ($data['change_amount'] ?? 0), 2),
             'status' => Sale::STATUS_COMPLETED,
         ]);
 
@@ -360,5 +375,18 @@ class SaleService
         }
 
         return $sale;
+    }
+
+    private function nextOrderNumber(int $tenantId): int
+    {
+        $tenant = Tenant::query()
+            ->whereKey($tenantId)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $next = $tenant->last_order_number + 1;
+        $tenant->update(['last_order_number' => $next]);
+
+        return $next;
     }
 }
