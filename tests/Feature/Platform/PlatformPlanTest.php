@@ -139,18 +139,6 @@ class PlatformPlanTest extends TestCase
         $this->assertNull(collect($response->json())->firstWhere('slug', 'startup-pro'));
     }
 
-    private function registerOwner(string $mobile = '8801712345699'): User
-    {
-        $this->postJson('/api/v1/auth/register', [
-            'shop_name' => 'Platform Shop '.$mobile,
-            'owner_name' => 'Owner',
-            'mobile' => $mobile,
-            'pin' => '123456',
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
-    }
-
     private function createSuperAdmin(string $mobile): User
     {
         Role::findOrCreate('super_admin', 'web');

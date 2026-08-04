@@ -34,7 +34,7 @@ class RegisterRequest extends FormRequest
                 Rule::unique('users', 'mobile'),
             ],
             'pin' => ['required', 'digits:6'],
-            'plan_slug' => ['nullable', 'string', Rule::exists('plans', 'slug')->where('is_active', true)],
+            'plan_slug' => ['prohibited'],
         ];
     }
 

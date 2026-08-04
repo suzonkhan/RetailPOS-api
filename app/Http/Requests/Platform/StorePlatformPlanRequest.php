@@ -24,6 +24,7 @@ class StorePlatformPlanRequest extends FormRequest
             'max_categories' => ['required', 'integer', 'min:1'],
             'max_products' => ['required', 'integer', 'min:1'],
             'is_active' => ['sometimes', 'boolean'],
+            'is_trial_default' => ['sometimes', 'boolean'],
         ];
     }
 }

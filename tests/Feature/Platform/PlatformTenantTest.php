@@ -3,7 +3,7 @@
 namespace Tests\Feature\Platform;
 
 use App\Models\Plan;
-use App\Models\Tenant;
+use App\Models\Store;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -60,7 +60,7 @@ class PlatformTenantTest extends TestCase
     public function test_super_admin_can_filter_tenants_by_status(): void
     {
         $owner = $this->registerOwner('8801712345602');
-        $owner->tenant->update(['status' => Tenant::STATUS_SUSPENDED]);
+        $this->defaultStore($owner)->update(['status' => Store::STATUS_SUSPENDED]);
 
         $this->registerOwner('8801712345603');
         $admin = $this->createSuperAdmin('8801711111112');
@@ -71,7 +71,7 @@ class PlatformTenantTest extends TestCase
 
         $response->assertOk();
         $this->assertCount(1, $response->json('data'));
-        $this->assertSame(Tenant::STATUS_SUSPENDED, $response->json('data.0.status'));
+        $this->assertSame(Store::STATUS_SUSPENDED, $response->json('data.0.status'));
     }
 
     public function test_super_admin_shows_tenant_detail_with_usage(): void
@@ -85,9 +85,9 @@ class PlatformTenantTest extends TestCase
             ->assertOk()
             ->assertJsonPath('id', $owner->tenant_id)
             ->assertJsonPath('owner.mobile', '8801712345604')
-            ->assertJsonPath('usage.users.current', 1)
-            ->assertJsonPath('usage.users.max', $owner->tenant->plan->max_users)
-            ->assertJsonPath('plan.slug', 'startup');
+            ->assertJsonPath('branches.0.usage.users.current', 0)
+            ->assertJsonPath('branches.0.usage.users.max', 2)
+            ->assertJsonPath('branches.0.plan.slug', 'startup');
     }
 
     public function test_super_admin_can_suspend_tenant(): void
@@ -98,35 +98,35 @@ class PlatformTenantTest extends TestCase
         Sanctum::actingAs($admin);
 
         $this->patchJson('/api/v1/platform/tenants/'.$owner->tenant_id, [
-            'status' => Tenant::STATUS_SUSPENDED,
+            'status' => Store::STATUS_SUSPENDED,
         ])
             ->assertOk()
-            ->assertJsonPath('status', Tenant::STATUS_SUSPENDED);
+            ->assertJsonPath('branches.0.status', Store::STATUS_SUSPENDED);
 
         $this->assertSame(
-            Tenant::STATUS_SUSPENDED,
-            $owner->tenant->fresh()->status
+            Store::STATUS_SUSPENDED,
+            $this->defaultStore($owner)->fresh()->status
         );
     }
 
     public function test_super_admin_can_activate_suspended_tenant(): void
     {
         $owner = $this->registerOwner('8801712345606');
-        $owner->tenant->update(['status' => Tenant::STATUS_SUSPENDED]);
+        $this->defaultStore($owner)->update(['status' => Store::STATUS_SUSPENDED]);
 
         $admin = $this->createSuperAdmin('8801711111115');
 
         Sanctum::actingAs($admin);
 
         $this->patchJson('/api/v1/platform/tenants/'.$owner->tenant_id, [
-            'status' => Tenant::STATUS_ACTIVE,
+            'status' => Store::STATUS_ACTIVE,
         ])
             ->assertOk()
-            ->assertJsonPath('status', Tenant::STATUS_TRIAL);
+            ->assertJsonPath('branches.0.status', Store::STATUS_TRIAL);
 
         $this->assertSame(
-            Tenant::STATUS_TRIAL,
-            $owner->tenant->fresh()->status
+            Store::STATUS_TRIAL,
+            $this->defaultStore($owner)->fresh()->status
         );
     }
 
@@ -141,19 +141,19 @@ class PlatformTenantTest extends TestCase
             'plan_slug' => 'startup-plus',
         ])
             ->assertOk()
-            ->assertJsonPath('plan.slug', 'startup-plus');
+            ->assertJsonPath('branches.0.plan.slug', 'startup-plus');
 
         $this->assertSame(
             Plan::query()->where('slug', 'startup-plus')->value('id'),
-            $owner->tenant->fresh()->plan_id
+            $this->defaultStore($owner)->fresh()->plan_id
         );
     }
 
     public function test_super_admin_can_extend_trial_by_days(): void
     {
         $owner = $this->registerOwner('8801712345608');
-        $owner->tenant->update([
-            'status' => Tenant::STATUS_EXPIRED,
+        $this->defaultStore($owner)->update([
+            'status' => Store::STATUS_EXPIRED,
             'trial_ends_at' => now()->subDay(),
         ]);
 
@@ -165,11 +165,11 @@ class PlatformTenantTest extends TestCase
             'extend_trial_days' => 14,
         ])
             ->assertOk()
-            ->assertJsonPath('status', Tenant::STATUS_TRIAL);
+            ->assertJsonPath('branches.0.status', Store::STATUS_TRIAL);
 
-        $tenant = $owner->tenant->fresh();
-        $this->assertSame(Tenant::STATUS_TRIAL, $tenant->status);
-        $this->assertTrue($tenant->trial_ends_at->isFuture());
+        $branch = $this->defaultStore($owner)->fresh();
+        $this->assertSame(Store::STATUS_TRIAL, $branch->status);
+        $this->assertTrue($branch->trial_ends_at->isFuture());
     }
 
     public function test_patch_requires_at_least_one_field(): void
@@ -199,9 +199,9 @@ class PlatformTenantTest extends TestCase
         ]);
 
         $response->assertCreated()
-            ->assertJsonPath('name', 'New Platform Shop')
+            ->assertJsonPath('name', 'New Owner')
             ->assertJsonPath('owner.mobile', '8801712345610')
-            ->assertJsonPath('plan.slug', 'startup-plus');
+            ->assertJsonPath('branches.0.plan.slug', 'startup');
 
         $this->assertDatabaseHas('users', [
             'mobile' => '8801712345610',
@@ -223,18 +223,6 @@ class PlatformTenantTest extends TestCase
             'mobile' => '8801712345611',
             'pin' => '999999',
         ])->assertOk();
-    }
-
-    private function registerOwner(string $mobile = '8801712345699'): User
-    {
-        $this->postJson('/api/v1/auth/register', [
-            'shop_name' => 'Platform Shop '.$mobile,
-            'owner_name' => 'Owner',
-            'mobile' => $mobile,
-            'pin' => '123456',
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
     }
 
     private function createSuperAdmin(string $mobile): User

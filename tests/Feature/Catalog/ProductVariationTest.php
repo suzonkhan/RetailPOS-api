@@ -158,6 +158,7 @@ class ProductVariationTest extends TestCase
             'selling_price' => 800,
             'cost_price' => 500,
             'uom' => 'pcs',
+            'manage_inventory' => true,
         ])->json('id');
 
         $setup = $this->putJson("/api/v1/products/{$productId}/variations/setup", [

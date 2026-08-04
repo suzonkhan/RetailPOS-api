@@ -4,6 +4,12 @@ return [
 
     'trial_days' => (int) env('RETAIL360_TRIAL_DAYS', 15),
 
+    'trial_plan_slug' => env('RETAIL360_TRIAL_PLAN', 'startup'),
+
+    'default_branch_name' => env('RETAIL360_DEFAULT_BRANCH_NAME', 'My Store'),
+
+    'expired_branch_purge_days' => (int) env('RETAIL360_EXPIRED_BRANCH_PURGE_DAYS', 30),
+
     'pin_lockout' => [
         'max_attempts' => (int) env('PIN_LOCKOUT_MAX_ATTEMPTS', 5),
         'lockout_minutes' => (int) env('PIN_LOCKOUT_MINUTES', 15),

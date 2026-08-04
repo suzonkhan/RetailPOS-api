@@ -34,7 +34,7 @@ class ExpensesTest extends TestCase
         ])->assertCreated();
 
         $this->owner = User::query()->where('mobile', '8801712345800')->firstOrFail();
-        $this->owner->tenant->plan->update(['max_users' => 10]);
+        $this->activateDefaultBranch($this->owner, 'startup-pro');
     }
 
     public function test_listing_categories_seeds_staff_salary(): void
@@ -187,13 +187,6 @@ class ExpensesTest extends TestCase
         }
         $mobile = substr($mobile, 0, 13);
 
-        $this->actingAs($this->owner, 'sanctum')->postJson('/api/v1/users', [
-            'name' => ucfirst($role),
-            'mobile' => $mobile,
-            'pin' => '123456',
-            'role' => $role,
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
+        return $this->createBranchUser($this->owner, $role, $mobile, 'startup-pro');
     }
 }

@@ -3,42 +3,41 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Services\Branch\BranchScopeService;
 use App\Services\Catalog\CatalogPlanLimitService;
+use App\Services\Users\UserService;
 use Illuminate\Http\JsonResponse;
 
 class TenantUsageController extends Controller
 {
     public function __construct(
         private readonly CatalogPlanLimitService $catalogPlanLimits,
+        private readonly BranchScopeService $branchScope,
+        private readonly UserService $userService,
     ) {}
 
     public function show(): JsonResponse
     {
-        $tenant = request()->user()->tenant?->load('plan');
+        $branch = $this->branchScope->resolveBranch(request()->user());
+        $branch->load('plan');
+        $plan = $branch->plan;
 
-        if ($tenant === null || $tenant->plan === null) {
+        if ($plan === null) {
             return response()->json(['usage' => null]);
         }
-
-        $plan = $tenant->plan;
-        $userCount = User::query()
-            ->where('tenant_id', $tenant->id)
-            ->where('is_platform_admin', false)
-            ->count();
 
         return response()->json([
             'usage' => [
                 'users' => [
-                    'current' => $userCount,
+                    'current' => $this->userService->branchUserCount($branch),
                     'max' => $plan->max_users,
                 ],
                 'categories' => [
-                    'current' => $this->catalogPlanLimits->categoryCount($tenant),
+                    'current' => $this->catalogPlanLimits->categoryCount($branch),
                     'max' => $plan->max_categories,
                 ],
                 'products' => [
-                    'current' => $this->catalogPlanLimits->productCount($tenant),
+                    'current' => $this->catalogPlanLimits->productCount($branch),
                     'max' => $plan->max_products,
                 ],
             ],

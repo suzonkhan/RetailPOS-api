@@ -17,13 +17,20 @@ class Plan extends Model
         'max_categories',
         'max_products',
         'is_active',
+        'is_trial_default',
     ];
 
     protected function casts(): array
     {
         return [
             'is_active' => 'boolean',
+            'is_trial_default' => 'boolean',
         ];
+    }
+
+    public function stores(): HasMany
+    {
+        return $this->hasMany(Store::class);
     }
 
     public function tenants(): HasMany

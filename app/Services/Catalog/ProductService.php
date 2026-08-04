@@ -80,7 +80,7 @@ class ProductService
         $store = $this->catalogScope->resolveStore($user);
         $tenant = $user->tenant;
 
-        $this->planLimits->assertCanAddProduct($tenant);
+        $this->planLimits->assertCanAddProduct($store);
 
         $manageInventory = $data['manage_inventory'] ?? false;
         $barcode = $this->resolveBarcode(

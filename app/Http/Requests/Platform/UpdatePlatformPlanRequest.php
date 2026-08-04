@@ -23,6 +23,7 @@ class UpdatePlatformPlanRequest extends FormRequest
             'max_categories' => ['sometimes', 'integer', 'min:1'],
             'max_products' => ['sometimes', 'integer', 'min:1'],
             'is_active' => ['sometimes', 'boolean'],
+            'is_trial_default' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -38,6 +39,7 @@ class UpdatePlatformPlanRequest extends FormRequest
                 'max_categories',
                 'max_products',
                 'is_active',
+                'is_trial_default',
             ])) {
                 $validator->errors()->add('body', 'At least one field is required.');
             }

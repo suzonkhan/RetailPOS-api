@@ -1119,24 +1119,13 @@ class SalesTest extends TestCase
 
     private function createTenantUser(string $role): User
     {
-        $this->owner->tenant->update([
-            'plan_id' => Plan::query()->where('slug', 'startup-plus')->value('id'),
-        ]);
-
         $mobile = match ($role) {
             'cashier' => '8801712345922',
             'staff' => '8801712345923',
             default => '8801712345998',
         };
 
-        $this->actingAs($this->owner, 'sanctum')->postJson('/api/v1/users', [
-            'name' => ucfirst($role),
-            'mobile' => $mobile,
-            'pin' => '111111',
-            'role' => $role,
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
+        return $this->createBranchUser($this->owner, $role, $mobile);
     }
 
     private function registerOtherOwner(string $mobile): User

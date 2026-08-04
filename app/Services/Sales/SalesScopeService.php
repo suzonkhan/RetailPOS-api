@@ -7,27 +7,22 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\Branch\BranchScopeService;
 
 class SalesScopeService
 {
+    public function __construct(
+        private readonly BranchScopeService $branchScope,
+    ) {}
+
     public function resolveStore(User $user): Store
     {
-        $store = $user->tenant?->store;
-
-        if ($store === null) {
-            abort(404, 'Store not found.');
-        }
-
-        return $store;
+        return $this->branchScope->resolveBranch($user);
     }
 
     public function authorizeStoreResource(User $user, object $model): void
     {
-        $store = $user->tenant?->store;
-
-        if ($store === null || (int) $model->store_id !== (int) $store->id) {
-            abort(404);
-        }
+        $this->branchScope->authorizeBranchResource($user, $model);
     }
 
     public function authorizeCustomer(User $user, Customer $customer): void

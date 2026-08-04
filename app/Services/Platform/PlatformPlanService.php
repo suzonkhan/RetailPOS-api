@@ -21,6 +21,10 @@ class PlatformPlanService
     {
         $yearlyPrice = $data['yearly_price'] ?? ($data['monthly_price'] * 12);
 
+        if (! empty($data['is_trial_default'])) {
+            $this->clearTrialDefault();
+        }
+
         return Plan::query()->create([
             'name' => $data['name'],
             'slug' => $data['slug'],
@@ -31,6 +35,7 @@ class PlatformPlanService
             'max_categories' => $data['max_categories'],
             'max_products' => $data['max_products'],
             'is_active' => $data['is_active'] ?? true,
+            'is_trial_default' => $data['is_trial_default'] ?? false,
         ]);
     }
 
@@ -42,6 +47,10 @@ class PlatformPlanService
             ]);
         }
 
+        if (! empty($data['is_trial_default'])) {
+            $this->clearTrialDefault($plan->id);
+        }
+
         $payload = collect($data)->only([
             'name',
             'monthly_price',
@@ -51,6 +60,7 @@ class PlatformPlanService
             'max_categories',
             'max_products',
             'is_active',
+            'is_trial_default',
         ])->all();
 
         if (isset($payload['monthly_price']) && ! array_key_exists('yearly_price', $payload)) {
@@ -74,5 +84,12 @@ class PlatformPlanService
         }
 
         return $slug;
+    }
+
+    private function clearTrialDefault(?int $exceptPlanId = null): void
+    {
+        Plan::query()
+            ->when($exceptPlanId !== null, fn ($q) => $q->where('id', '!=', $exceptPlanId))
+            ->update(['is_trial_default' => false]);
     }
 }

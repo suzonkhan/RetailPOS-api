@@ -2,8 +2,9 @@
 
 namespace App\Http\Resources;
 
-use App\Models\Tenant;
+use App\Models\Store;
 use App\Models\User;
+use App\Services\Branch\BranchScopeService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,7 +14,9 @@ class AuthMeResource extends JsonResource
     public function toArray(Request $request): array
     {
         $tenant = $this->tenant;
-        $plan = $tenant?->plan;
+        $branchScope = app(BranchScopeService::class);
+        $branches = $branchScope->accessibleBranches($this->resource);
+        $currentBranch = $this->resolveCurrentBranch($branchScope, $branches);
 
         return [
             'user' => [
@@ -28,43 +31,32 @@ class AuthMeResource extends JsonResource
                 'id' => $tenant->id,
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
-                'status' => $tenant->status,
             ] : null,
-            'store' => $tenant?->store ? [
-                'id' => $tenant->store->id,
-                'name' => $tenant->store->name,
+            'branches' => BranchResource::collection($branches)->resolve(),
+            'current_branch' => $currentBranch ? BranchResource::make($currentBranch)->resolve() : null,
+            'store' => $currentBranch ? [
+                'id' => $currentBranch->id,
+                'name' => $currentBranch->name,
             ] : null,
-            'subscription' => $this->subscriptionPayload($tenant, $plan),
+            'subscription' => $currentBranch
+                ? BranchSubscriptionResource::make($currentBranch)->resolve()
+                : null,
         ];
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @param  \Illuminate\Support\Collection<int, Store>  $branches
      */
-    private function subscriptionPayload(?Tenant $tenant, $plan): ?array
+    private function resolveCurrentBranch(BranchScopeService $branchScope, $branches): ?Store
     {
-        if ($tenant === null) {
+        if ($branches->isEmpty()) {
             return null;
         }
 
-        $isTrial = $tenant->isOnTrial();
-        $trialDaysRemaining = $tenant->trialDaysRemaining();
-
-        return [
-            'status' => $tenant->status,
-            'is_trial' => $isTrial,
-            'trial_ends_at' => $tenant->trial_ends_at?->toIso8601String(),
-            'trial_days_remaining' => $trialDaysRemaining,
-            'subscribed_at' => $tenant->subscribed_at?->toIso8601String(),
-            'current_period_ends_at' => $tenant->current_period_ends_at?->toIso8601String(),
-            'billing_cycle' => $tenant->billing_cycle,
-            'plan' => $plan ? [
-                'id' => $plan->id,
-                'name' => $plan->name,
-                'slug' => $plan->slug,
-                'monthly_price' => $plan->monthly_price,
-                'yearly_price' => $plan->yearly_price,
-            ] : null,
-        ];
+        try {
+            return $branchScope->resolveBranch($this->resource);
+        } catch (\Throwable) {
+            return $branches->first();
+        }
     }
 }

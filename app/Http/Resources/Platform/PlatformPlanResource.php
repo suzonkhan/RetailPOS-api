@@ -22,6 +22,7 @@ class PlatformPlanResource extends JsonResource
             'max_categories' => $this->max_categories,
             'max_products' => $this->max_products,
             'is_active' => $this->is_active,
+            'is_trial_default' => $this->is_trial_default,
             'tenants_count' => $this->whenCounted('tenants'),
         ];
     }

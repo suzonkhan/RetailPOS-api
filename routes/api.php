@@ -5,7 +5,11 @@ use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\MeController;
 use App\Http\Controllers\Api\V1\Auth\RegisterController;
+use App\Http\Controllers\Api\V1\Auth\SetDefaultBranchController;
 use App\Http\Controllers\Api\V1\BkashWebhookController;
+use App\Http\Controllers\Api\V1\BranchController;
+use App\Http\Controllers\Api\V1\BranchSubscriptionController;
+use App\Http\Controllers\Api\V1\BranchUsageController;
 use App\Http\Controllers\Api\V1\CheckoutBkashController;
 use App\Http\Controllers\Api\V1\CheckoutQuoteController;
 use App\Http\Controllers\Api\V1\BrandController;
@@ -32,8 +36,10 @@ use App\Http\Controllers\Api\V1\SaleReturnController;
 use App\Http\Controllers\Api\V1\TenantSettingsController;
 use App\Http\Controllers\Api\V1\TenantSubscriptionController;
 use App\Http\Controllers\Api\V1\TenantUsageController;
+use App\Http\Controllers\Api\V1\Platform\PlatformBranchController;
 use App\Http\Controllers\Api\V1\Platform\PlatformCouponController;
 use App\Http\Controllers\Api\V1\Platform\PlatformPlanController;
+use App\Http\Controllers\Api\V1\Platform\PlatformTenantBillingController;
 use App\Http\Controllers\Api\V1\Platform\PlatformTenantController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
@@ -57,10 +63,17 @@ Route::prefix('v1')->group(function () {
             Route::post('/logout', LogoutController::class);
             Route::get('/me', MeController::class);
             Route::post('/pin/change', ChangePinController::class);
+            Route::patch('/me/default-branch', SetDefaultBranchController::class);
         });
     });
 
-    Route::middleware(['auth:sanctum', 'tenant.member', 'subscription.active'])->group(function () {
+    Route::middleware(['auth:sanctum', 'tenant.member'])->group(function () {
+        Route::get('/tenant/branches', [BranchController::class, 'index']);
+        Route::get('/tenant/branches/{branch}', [BranchController::class, 'show']);
+        Route::patch('/tenant/branches/{branch}', [BranchController::class, 'update']);
+        Route::get('/tenant/branches/{branch}/subscription', [BranchSubscriptionController::class, 'show']);
+        Route::get('/tenant/branches/{branch}/usage', [BranchUsageController::class, 'show']);
+
         Route::middleware('permission:subscription.manage')->group(function () {
             Route::post('/checkout/quote', CheckoutQuoteController::class);
             Route::post('/checkout/bkash/create', [CheckoutBkashController::class, 'create']);
@@ -68,7 +81,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/tenant/subscription', [TenantSubscriptionController::class, 'show']);
             Route::get('/tenant/usage', [TenantUsageController::class, 'show']);
         });
+    });
 
+    Route::middleware(['auth:sanctum', 'tenant.member', 'subscription.active'])->group(function () {
         Route::middleware('permission:users.manage')->group(function () {
             Route::apiResource('users', UserController::class);
             Route::post('/staff/{staff}/enable-login', [StaffController::class, 'enableLogin']);
@@ -167,11 +182,14 @@ Route::prefix('v1')->group(function () {
 
     Route::middleware(['auth:sanctum', 'platform.admin'])->prefix('platform')->group(function () {
         Route::middleware('permission:platform.tenants')->group(function () {
+            Route::get('/branches', [PlatformBranchController::class, 'index']);
             Route::get('/tenants', [PlatformTenantController::class, 'index']);
             Route::post('/tenants', [PlatformTenantController::class, 'store']);
             Route::get('/tenants/{tenant}', [PlatformTenantController::class, 'show']);
             Route::patch('/tenants/{tenant}', [PlatformTenantController::class, 'update']);
             Route::patch('/tenants/{tenant}/owner-pin', [PlatformTenantController::class, 'resetOwnerPin']);
+            Route::get('/tenants/{tenant}/billing', [PlatformTenantBillingController::class, 'index']);
+            Route::post('/tenants/{tenant}/billing/{invoice}/approve', [PlatformTenantBillingController::class, 'approve']);
         });
 
         Route::middleware('permission:platform.plans')->group(function () {

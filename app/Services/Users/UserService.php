@@ -2,6 +2,7 @@
 
 namespace App\Services\Users;
 
+use App\Models\Store;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -18,47 +19,70 @@ class UserService
         $this->tenantRoles = config('retail360.tenant_roles', ['owner', 'cashier', 'staff']);
     }
 
-    public function tenantUserCount(Tenant $tenant): int
+    public function branchUserCount(Store $store): int
     {
-        return User::query()
-            ->where('tenant_id', $tenant->id)
+        return $store->users()
             ->where('is_platform_admin', false)
+            ->whereDoesntHave('roles', fn ($q) => $q->where('name', 'owner'))
             ->count();
     }
 
-    public function canAddUser(Tenant $tenant): bool
+    public function canAddUser(Store $store): bool
     {
-        $plan = $tenant->plan;
+        if ($store->isOnTrial()) {
+            return false;
+        }
+
+        $plan = $store->plan;
 
         if ($plan === null) {
             return false;
         }
 
-        return $this->tenantUserCount($tenant) < $plan->max_users;
+        return $this->branchUserCount($store) < $this->nonOwnerSeatLimit($plan->max_users);
     }
 
-    public function create(Tenant $tenant, array $data): User
+    private function nonOwnerSeatLimit(int $maxUsers): int
     {
-        if (! $this->canAddUser($tenant)) {
+        return max(0, $maxUsers - 1);
+    }
+
+    public function create(Tenant $tenant, Store $store, array $data): User
+    {
+        if (! $this->canAddUser($store)) {
+            if ($store->isOnTrial()) {
+                throw ValidationException::withMessages([
+                    'mobile' => ['Staff cannot be added during trial. Subscribe this branch first.'],
+                ]);
+            }
+
             throw ValidationException::withMessages([
-                'mobile' => ['Your plan user limit has been reached. Upgrade to add more users.'],
+                'mobile' => ['Your plan user limit has been reached for this branch. Upgrade to add more users.'],
             ]);
         }
 
         $this->assertValidRole($data['role']);
 
-        return DB::transaction(function () use ($tenant, $data) {
+        if ($data['role'] === 'owner') {
+            throw ValidationException::withMessages([
+                'role' => ['Additional owners cannot be invited. Use cashier or staff.'],
+            ]);
+        }
+
+        return DB::transaction(function () use ($tenant, $store, $data) {
             $user = User::query()->create([
                 'name' => $data['name'],
                 'mobile' => $data['mobile'],
                 'pin_hash' => $data['pin'],
                 'tenant_id' => $tenant->id,
+                'default_store_id' => $store->id,
                 'is_platform_admin' => false,
             ]);
 
             $user->assignRole($data['role']);
+            $store->users()->attach($user->id, ['is_primary' => true]);
 
-            return $user->load('roles');
+            return $user->load(['roles', 'stores']);
         });
     }
 
@@ -81,7 +105,7 @@ class UserService
                 $user->syncRoles([$data['role']]);
             }
 
-            return $user->fresh(['roles']);
+            return $user->fresh(['roles', 'stores']);
         });
     }
 

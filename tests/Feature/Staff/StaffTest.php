@@ -35,7 +35,7 @@ class StaffTest extends TestCase
         ])->assertCreated();
 
         $this->owner = User::query()->where('mobile', '8801712345700')->firstOrFail();
-        $this->owner->tenant->plan->update(['max_users' => 10]);
+        $this->activateDefaultBranch($this->owner, 'startup-pro');
     }
 
     public function test_owner_can_crud_staff_without_login(): void
@@ -150,7 +150,7 @@ class StaffTest extends TestCase
             ->where('tenant_id', $this->owner->tenant_id)
             ->where('is_platform_admin', false)
             ->count();
-        $this->owner->tenant->plan->update(['max_users' => $count]);
+        $this->defaultStore($this->owner)->plan->update(['max_users' => $count]);
 
         $this->postJson("/api/v1/staff/{$staff2Id}/enable-login", [
             'mobile' => '8801712345713',
@@ -198,13 +198,6 @@ class StaffTest extends TestCase
         }
         $mobile = substr($mobile, 0, 13);
 
-        $this->actingAs($this->owner, 'sanctum')->postJson('/api/v1/users', [
-            'name' => ucfirst($role),
-            'mobile' => $mobile,
-            'pin' => '123456',
-            'role' => $role,
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
+        return $this->createBranchUser($this->owner, $role, $mobile, 'startup-pro');
     }
 }

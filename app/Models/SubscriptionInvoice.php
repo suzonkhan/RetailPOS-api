@@ -17,10 +17,19 @@ class SubscriptionInvoice extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const INTENT_CREATE_BRANCH = 'create_branch';
+
+    public const INTENT_RENEW = 'renew';
+
+    public const INTENT_UPGRADE = 'upgrade';
+
     protected $fillable = [
         'tenant_id',
+        'store_id',
         'plan_id',
         'coupon_id',
+        'intent',
+        'branch_meta',
         'billing_cycle',
         'subtotal',
         'discount_amount',
@@ -33,12 +42,18 @@ class SubscriptionInvoice extends Model
     {
         return [
             'paid_at' => 'datetime',
+            'branch_meta' => 'array',
         ];
     }
 
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
     }
 
     public function plan(): BelongsTo

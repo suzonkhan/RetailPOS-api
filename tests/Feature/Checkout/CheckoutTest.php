@@ -3,7 +3,7 @@
 namespace Tests\Feature\Checkout;
 
 use App\Models\Coupon;
-use App\Models\Tenant;
+use App\Models\Store;
 use App\Models\User;
 use App\Services\Bkash\MockBkashGateway;
 use Database\Seeders\PlanSeeder;
@@ -34,10 +34,7 @@ class CheckoutTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $this->postJson('/api/v1/checkout/quote', [
-            'plan_slug' => 'startup-plus',
-            'billing_cycle' => 'yearly',
-        ])
+        $this->postJson('/api/v1/checkout/quote', $this->renewCheckoutPayload($owner, 'startup-plus', 'yearly'))
             ->assertOk()
             ->assertJsonPath('subtotal', 588)
             ->assertJsonPath('discount_amount', 0)
@@ -48,7 +45,7 @@ class CheckoutTest extends TestCase
 
     public function test_checkout_quote_with_percent_coupon(): void
     {
-        $owner = $this->registerOwner();
+        $owner = $this->registerOwner('8801712345698');
 
         Coupon::query()->create([
             'code' => 'SAVE10',
@@ -59,11 +56,10 @@ class CheckoutTest extends TestCase
 
         Sanctum::actingAs($owner);
 
-        $this->postJson('/api/v1/checkout/quote', [
-            'plan_slug' => 'startup',
-            'billing_cycle' => 'monthly',
-            'coupon_code' => 'save10',
-        ])
+        $this->postJson('/api/v1/checkout/quote', array_merge(
+            $this->renewCheckoutPayload($owner, 'startup', 'monthly'),
+            ['coupon_code' => 'save10']
+        ))
             ->assertOk()
             ->assertJsonPath('subtotal', 20)
             ->assertJsonPath('discount_amount', 2)
@@ -73,20 +69,13 @@ class CheckoutTest extends TestCase
 
     public function test_mock_payment_flow_activates_subscription(): void
     {
-        $owner = $this->registerOwner();
-        $tenant = $owner->tenant;
-
-        $tenant->update([
-            'trial_ends_at' => now()->subDay(),
-            'status' => Tenant::STATUS_EXPIRED,
-        ]);
+        $owner = $this->registerOwner('8801712345697');
+        $store = $this->expireDefaultBranch($owner);
 
         Sanctum::actingAs($owner);
 
-        $create = $this->postJson('/api/v1/checkout/bkash/create', [
-            'plan_slug' => 'startup',
-            'billing_cycle' => 'monthly',
-        ])->assertOk()
+        $create = $this->postJson('/api/v1/checkout/bkash/create', $this->renewCheckoutPayload($owner))
+            ->assertOk()
             ->assertJsonPath('gateway', 'mock')
             ->assertJsonStructure(['bkashURL', 'payment_id', 'invoice_id']);
 
@@ -97,49 +86,40 @@ class CheckoutTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('status', 'completed')
-            ->assertJsonPath('subscription.status', Tenant::STATUS_ACTIVE);
+            ->assertJsonPath('subscription.status', Store::STATUS_ACTIVE);
 
-        $tenant->refresh();
+        $store->refresh();
 
-        $this->assertSame(Tenant::STATUS_ACTIVE, $tenant->status);
-        $this->assertNotNull($tenant->subscribed_at);
-        $this->assertNotNull($tenant->current_period_ends_at);
-        $this->assertTrue($tenant->current_period_ends_at->isFuture());
-        $this->assertSame('monthly', $tenant->billing_cycle);
+        $this->assertSame(Store::STATUS_ACTIVE, $store->status);
+        $this->assertNotNull($store->subscribed_at);
+        $this->assertNotNull($store->current_period_ends_at);
+        $this->assertTrue($store->current_period_ends_at->isFuture());
+        $this->assertSame('monthly', $store->billing_cycle);
     }
 
     public function test_expired_trial_returns_402_on_protected_route(): void
     {
-        $owner = $this->registerOwner();
-        $owner->tenant->update([
-            'trial_ends_at' => now()->subDay(),
-            'status' => Tenant::STATUS_EXPIRED,
-        ]);
+        $owner = $this->registerOwner('8801712345696');
+        $this->expireDefaultBranch($owner);
 
         Sanctum::actingAs($owner);
 
         $this->getJson('/api/v1/reports/sales-summary')
             ->assertStatus(402)
-            ->assertJsonPath('trial_ended', true)
-            ->assertJsonPath('subscribe_url', '/subscription/pay');
+            ->assertJsonPath('trial_ended', true);
 
         $this->getJson('/api/v1/tenant/subscription')->assertOk();
-        $this->postJson('/api/v1/checkout/quote', [
-            'plan_slug' => 'startup',
-            'billing_cycle' => 'monthly',
-        ])->assertOk();
+        $this->postJson('/api/v1/checkout/quote', $this->renewCheckoutPayload($owner))->assertOk();
     }
 
     public function test_webhook_idempotency(): void
     {
-        $owner = $this->registerOwner();
+        $owner = $this->registerOwner('8801712345695');
 
         Sanctum::actingAs($owner);
 
-        $create = $this->postJson('/api/v1/checkout/bkash/create', [
-            'plan_slug' => 'startup',
-            'billing_cycle' => 'monthly',
-        ])->assertOk();
+        $create = $this->postJson('/api/v1/checkout/bkash/create', $this->renewCheckoutPayload($owner))
+            ->assertOk();
 
         $paymentId = $create->json('payment_id');
 
@@ -153,8 +133,8 @@ class CheckoutTest extends TestCase
             ->assertOk()
             ->assertJsonPath('status', 'processed');
 
-        $owner->tenant->refresh();
-        $this->assertSame(Tenant::STATUS_ACTIVE, $owner->tenant->status);
+        $store = $this->defaultStore($owner)->fresh();
+        $this->assertSame(Store::STATUS_ACTIVE, $store->status);
 
         $this->postJson('/api/v1/bkash/webhook', $payload)
             ->assertOk()
@@ -164,37 +144,12 @@ class CheckoutTest extends TestCase
     public function test_cashier_cannot_access_checkout(): void
     {
         $owner = $this->registerOwner('8801712345700');
-
-        $owner->tenant->update([
-            'plan_id' => \App\Models\Plan::query()->where('slug', 'startup-plus')->value('id'),
-        ]);
-
-        $this->actingAs($owner, 'sanctum')->postJson('/api/v1/users', [
-            'name' => 'Cashier',
-            'mobile' => '8801712345701',
-            'pin' => '654321',
-            'role' => 'cashier',
-        ])->assertCreated();
-
-        $cashier = User::query()->where('mobile', '8801712345701')->firstOrFail();
+        $this->upgradeTenantPlan($owner, 'startup-plus');
+        $cashier = $this->createBranchUser($owner, 'cashier', '8801712345701');
 
         Sanctum::actingAs($cashier);
 
-        $this->postJson('/api/v1/checkout/quote', [
-            'plan_slug' => 'startup',
-            'billing_cycle' => 'monthly',
-        ])->assertForbidden();
-    }
-
-    private function registerOwner(string $mobile = '8801712345699'): User
-    {
-        $this->postJson('/api/v1/auth/register', [
-            'shop_name' => 'Checkout Shop',
-            'owner_name' => 'Owner',
-            'mobile' => $mobile,
-            'pin' => '123456',
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
+        $this->postJson('/api/v1/checkout/quote', $this->renewCheckoutPayload($owner))
+            ->assertForbidden();
     }
 }

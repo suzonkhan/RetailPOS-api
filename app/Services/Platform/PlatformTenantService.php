@@ -3,20 +3,27 @@
 namespace App\Services\Platform;
 
 use App\Models\Plan;
+use App\Models\Store;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\Auth\RegistrationService;
+use App\Services\Branch\BranchService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PlatformTenantService
 {
+    public function __construct(
+        private readonly BranchService $branchService,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $filters
      */
     public function list(array $filters): LengthAwarePaginator
     {
-        $query = Tenant::query()->with(['plan', 'store']);
+        $query = Tenant::query()->with(['stores.plan'])->withCount('stores');
 
         if (! empty($filters['search'])) {
             $search = $filters['search'];
@@ -27,7 +34,7 @@ class PlatformTenantService
         }
 
         if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            $query->whereHas('stores', fn ($q) => $q->where('status', $filters['status']));
         }
 
         $perPage = min(max((int) ($filters['per_page'] ?? 15), 1), 100);
@@ -64,7 +71,7 @@ class PlatformTenantService
     {
         $user = app(RegistrationService::class)->register($data);
 
-        return $user->tenant->fresh(['plan', 'store']);
+        return $user->tenant->fresh(['stores.plan']);
     }
 
     public function resetOwnerPin(Tenant $tenant, string $pin): User
@@ -86,11 +93,13 @@ class PlatformTenantService
     public function update(Tenant $tenant, array $data): Tenant
     {
         return DB::transaction(function () use ($tenant, $data) {
+            $branch = $this->resolveBranch($tenant, $data['branch_id'] ?? null);
+
             if (isset($data['status'])) {
-                if ($data['status'] === Tenant::STATUS_SUSPENDED) {
-                    $tenant->update(['status' => Tenant::STATUS_SUSPENDED]);
-                } elseif ($data['status'] === Tenant::STATUS_ACTIVE) {
-                    $this->activate($tenant);
+                if ($data['status'] === Store::STATUS_SUSPENDED) {
+                    $this->branchService->suspend($branch);
+                } elseif ($data['status'] === Store::STATUS_ACTIVE) {
+                    $this->branchService->resume($branch);
                 }
             }
 
@@ -100,40 +109,63 @@ class PlatformTenantService
                     ->where('is_active', true)
                     ->firstOrFail();
 
-                $tenant->update(['plan_id' => $plan->id]);
+                $branch->update(['plan_id' => $plan->id]);
             }
 
             if (isset($data['trial_ends_at'])) {
-                $tenant->update([
+                $branch->update([
                     'trial_ends_at' => $data['trial_ends_at'],
-                    'status' => Tenant::STATUS_TRIAL,
+                    'status' => Store::STATUS_TRIAL,
+                    'data_purge_scheduled_at' => null,
                 ]);
             } elseif (isset($data['extend_trial_days'])) {
-                $base = $tenant->trial_ends_at !== null && $tenant->trial_ends_at->isFuture()
-                    ? $tenant->trial_ends_at->copy()
+                $base = $branch->trial_ends_at !== null && $branch->trial_ends_at->isFuture()
+                    ? $branch->trial_ends_at->copy()
                     : now();
 
-                $tenant->update([
+                $branch->update([
                     'trial_ends_at' => $base->addDays((int) $data['extend_trial_days']),
-                    'status' => Tenant::STATUS_TRIAL,
+                    'status' => Store::STATUS_TRIAL,
+                    'data_purge_scheduled_at' => null,
                 ]);
             }
 
-            return $tenant->fresh(['plan', 'store']);
+            return $tenant->fresh(['stores.plan']);
         });
     }
 
-    private function activate(Tenant $tenant): void
+    private function resolveBranch(Tenant $tenant, ?int $branchId): Store
     {
-        if ($tenant->trial_ends_at !== null && $tenant->trial_ends_at->isFuture()) {
-            $tenant->update(['status' => Tenant::STATUS_TRIAL]);
-        } elseif ($tenant->current_period_ends_at !== null && $tenant->current_period_ends_at->isFuture()) {
-            $tenant->update(['status' => Tenant::STATUS_ACTIVE]);
-        } else {
-            $tenant->update(['status' => Tenant::STATUS_EXPIRED]);
+        if ($branchId !== null) {
+            $branch = Store::query()
+                ->where('tenant_id', $tenant->id)
+                ->whereKey($branchId)
+                ->first();
+
+            if ($branch === null) {
+                throw ValidationException::withMessages([
+                    'branch_id' => ['Branch not found for this tenant.'],
+                ]);
+            }
+
+            return $branch;
         }
 
-        $tenant->refresh();
-        $tenant->syncSubscriptionStatus();
+        $branch = Store::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('is_default', true)
+            ->first();
+
+        if ($branch === null) {
+            $branch = Store::query()->where('tenant_id', $tenant->id)->orderBy('id')->first();
+        }
+
+        if ($branch === null) {
+            throw ValidationException::withMessages([
+                'branch_id' => ['Tenant has no branches.'],
+            ]);
+        }
+
+        return $branch;
     }
 }

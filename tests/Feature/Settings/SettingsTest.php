@@ -41,7 +41,7 @@ class SettingsTest extends TestCase
 
         $this->getJson('/api/v1/tenant/settings')
             ->assertOk()
-            ->assertJsonPath('name', 'Settings Shop')
+            ->assertJsonPath('name', 'My Store')
             ->assertJsonPath('vat_adjust_on_sale', false)
             ->assertJsonStructure(['uuid', 'store_id', 'updated_at']);
 
@@ -171,7 +171,7 @@ class SettingsTest extends TestCase
             ->assertJsonMissing(['id' => $inactiveId]);
 
         $methodId = PaymentMethod::query()
-            ->where('store_id', $this->owner->tenant->store->id)
+            ->where('store_id', $this->defaultStore($this->owner)->id)
             ->where('name', 'Cash')
             ->value('id');
 
@@ -195,7 +195,7 @@ class SettingsTest extends TestCase
         Sanctum::actingAs($this->owner);
 
         $methodId = PaymentMethod::query()
-            ->where('store_id', $this->owner->tenant->store->id)
+            ->where('store_id', $this->defaultStore($this->owner)->id)
             ->value('id');
 
         $otherOwner = $this->registerOtherOwner('8801712345810');
@@ -208,24 +208,13 @@ class SettingsTest extends TestCase
 
     private function createTenantUser(string $role): User
     {
-        $this->owner->tenant->update([
-            'plan_id' => \App\Models\Plan::query()->where('slug', 'startup-plus')->value('id'),
-        ]);
-
         $mobile = match ($role) {
             'cashier' => '8801712345801',
             'staff' => '8801712345802',
             default => '8801712345899',
         };
 
-        $this->actingAs($this->owner, 'sanctum')->postJson('/api/v1/users', [
-            'name' => ucfirst($role),
-            'mobile' => $mobile,
-            'pin' => '111111',
-            'role' => $role,
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
+        return $this->createBranchUser($this->owner, $role, $mobile);
     }
 
     private function registerOtherOwner(string $mobile): User

@@ -5,9 +5,10 @@ namespace App\Services\Checkout;
 use App\Contracts\BkashGateway;
 use App\Models\BkashPayment;
 use App\Models\Plan;
+use App\Models\Store;
 use App\Models\SubscriptionInvoice;
-use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Branch\BranchScopeService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,6 +19,7 @@ class CheckoutService
         private readonly CouponService $couponService,
         private readonly BkashGateway $bkashGateway,
         private readonly SubscriptionActivationService $activationService,
+        private readonly BranchScopeService $branchScope,
     ) {}
 
     /**
@@ -26,15 +28,22 @@ class CheckoutService
     public function createPayment(User $user, array $data): array
     {
         $tenant = $user->tenant;
-        $quote = $this->quoteService->quote($tenant, $data);
+        $intent = $data['intent'] ?? SubscriptionInvoice::INTENT_RENEW;
+        $store = $this->resolveStoreForCheckout($user, $data, $intent);
+        $quote = $this->quoteService->quote($tenant, $data, $store);
         $plan = Plan::query()->findOrFail($quote['plan']['id']);
         $coupon = $this->couponService->findValidCoupon($data['coupon_code'] ?? null, $plan);
 
-        return DB::transaction(function () use ($tenant, $plan, $quote, $coupon, $data) {
+        return DB::transaction(function () use ($tenant, $store, $plan, $quote, $coupon, $data, $intent) {
             $invoice = SubscriptionInvoice::query()->create([
                 'tenant_id' => $tenant->id,
+                'store_id' => $store?->id,
                 'plan_id' => $plan->id,
                 'coupon_id' => $coupon?->id,
+                'intent' => $intent,
+                'branch_meta' => $intent === SubscriptionInvoice::INTENT_CREATE_BRANCH
+                    ? ($data['branch_meta'] ?? null)
+                    : null,
                 'billing_cycle' => $data['billing_cycle'],
                 'subtotal' => $quote['subtotal'],
                 'discount_amount' => $quote['discount_amount'],
@@ -62,6 +71,7 @@ class CheckoutService
             return [
                 'invoice_id' => $invoice->id,
                 'payment_id' => $payment->payment_id,
+                'intent' => $intent,
                 'bkashURL' => $response['bkashURL'],
                 'amount' => $invoice->total_amount,
                 'currency' => 'BDT',
@@ -78,7 +88,7 @@ class CheckoutService
         $payment = BkashPayment::query()
             ->where('payment_id', $paymentId)
             ->whereHas('subscriptionInvoice', fn ($q) => $q->where('tenant_id', $user->tenant_id))
-            ->with('subscriptionInvoice.tenant')
+            ->with('subscriptionInvoice.store')
             ->first();
 
         if ($payment === null) {
@@ -107,9 +117,9 @@ class CheckoutService
             ]);
         }
 
-        $tenant = $this->activationService->activateFromInvoice($payment->subscriptionInvoice, $payment);
+        $store = $this->activationService->activateFromInvoice($payment->subscriptionInvoice, $payment);
 
-        return $this->successPayload($payment->fresh(), $tenant);
+        return $this->successPayload($payment->fresh(), $store);
     }
 
     /**
@@ -156,27 +166,51 @@ class CheckoutService
         return ['status' => 'processed'];
     }
 
+    private function resolveStoreForCheckout(User $user, array $data, string $intent): ?Store
+    {
+        if ($intent === SubscriptionInvoice::INTENT_CREATE_BRANCH) {
+            return null;
+        }
+
+        $storeId = $data['store_id'] ?? null;
+
+        if ($storeId === null) {
+            throw ValidationException::withMessages([
+                'store_id' => ['Branch is required for this checkout.'],
+            ]);
+        }
+
+        return $this->branchScope->resolveBranch($user, (int) $storeId);
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function successPayload(BkashPayment $payment, ?Tenant $tenant = null): array
+    private function successPayload(BkashPayment $payment, ?Store $store = null): array
     {
-        $tenant ??= $payment->subscriptionInvoice->tenant->fresh(['plan']);
+        $store ??= $payment->subscriptionInvoice->store?->fresh(['plan']);
 
         return [
             'payment_id' => $payment->payment_id,
             'status' => 'completed',
+            'intent' => $payment->subscriptionInvoice->intent,
             'transaction_status' => $payment->transaction_status,
-            'subscription' => [
-                'status' => $tenant->status,
-                'subscribed_at' => $tenant->subscribed_at?->toIso8601String(),
-                'current_period_ends_at' => $tenant->current_period_ends_at?->toIso8601String(),
-                'billing_cycle' => $tenant->billing_cycle,
-                'plan' => $tenant->plan ? [
-                    'id' => $tenant->plan->id,
-                    'slug' => $tenant->plan->slug,
+            'store' => $store ? [
+                'id' => $store->id,
+                'name' => $store->name,
+            ] : null,
+            'subscription' => $store ? [
+                'status' => $store->status,
+                'is_trial' => $store->isOnTrial(),
+                'subscribed_at' => $store->subscribed_at?->toIso8601String(),
+                'current_period_ends_at' => $store->current_period_ends_at?->toIso8601String(),
+                'billing_cycle' => $store->billing_cycle,
+                'plan' => $store->plan ? [
+                    'id' => $store->plan->id,
+                    'slug' => $store->plan->slug,
+                    'name' => $store->plan->name,
                 ] : null,
-            ],
+            ] : null,
         ];
     }
 }

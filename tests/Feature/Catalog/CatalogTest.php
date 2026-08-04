@@ -329,8 +329,8 @@ class CatalogTest extends TestCase
             ->assertOk()
             ->assertJsonPath('usage.categories.current', 1)
             ->assertJsonPath('usage.products.current', 1)
-            ->assertJsonPath('usage.categories.max', $this->owner->tenant->plan->max_categories)
-            ->assertJsonPath('usage.products.max', $this->owner->tenant->plan->max_products);
+            ->assertJsonPath('usage.categories.max', $this->defaultStore($this->owner)->plan->max_categories)
+            ->assertJsonPath('usage.products.max', $this->defaultStore($this->owner)->plan->max_products);
     }
 
     public function test_cashier_and_staff_can_manage_catalog(): void
@@ -544,24 +544,13 @@ class CatalogTest extends TestCase
 
     private function createTenantUser(string $role): User
     {
-        $this->owner->tenant->update([
-            'plan_id' => Plan::query()->where('slug', 'startup-plus')->value('id'),
-        ]);
-
         $mobile = match ($role) {
             'cashier' => '8801712345901',
             'staff' => '8801712345902',
             default => '8801712345999',
         };
 
-        $this->actingAs($this->owner, 'sanctum')->postJson('/api/v1/users', [
-            'name' => ucfirst($role),
-            'mobile' => $mobile,
-            'pin' => '111111',
-            'role' => $role,
-        ])->assertCreated();
-
-        return User::query()->where('mobile', $mobile)->firstOrFail();
+        return $this->createBranchUser($this->owner, $role, $mobile);
     }
 
     private function registerOtherOwner(string $mobile): User

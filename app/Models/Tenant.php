@@ -43,9 +43,19 @@ class Tenant extends Model
         return $this->belongsTo(Plan::class);
     }
 
+    public function stores(): HasMany
+    {
+        return $this->hasMany(Store::class);
+    }
+
     public function store(): HasOne
     {
-        return $this->hasOne(Store::class);
+        return $this->hasOne(Store::class)->where('is_default', true);
+    }
+
+    public function defaultStore(): HasOne
+    {
+        return $this->hasOne(Store::class)->where('is_default', true);
     }
 
     public function users(): HasMany

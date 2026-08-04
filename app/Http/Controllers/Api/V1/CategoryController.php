@@ -41,7 +41,7 @@ class CategoryController extends Controller
         $user = $request->user();
         $store = $this->catalogScope->resolveStore($user);
 
-        $this->planLimits->assertCanAddCategory($user->tenant);
+        $this->planLimits->assertCanAddCategory($store);
 
         $data = $request->validated();
 

@@ -186,7 +186,9 @@ class StaffService
         }
 
         return DB::transaction(function () use ($actor, $staff, $data, $mobile, $tenant) {
-            $user = $this->users->create($tenant, [
+            $store = $this->catalogScope->resolveStore($actor);
+
+            $user = $this->users->create($tenant, $store, [
                 'name' => $staff->name,
                 'mobile' => $mobile,
                 'pin' => $data['pin'],
@@ -203,7 +205,7 @@ class StaffService
 
     public function authorize(User $user, Staff $staff): void
     {
-        $store = $user->tenant?->store;
+        $store = $this->catalogScope->resolveStore($user);
 
         if ($store === null || (int) $staff->store_id !== (int) $store->id) {
             abort(404);

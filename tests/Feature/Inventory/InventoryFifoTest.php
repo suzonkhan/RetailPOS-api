@@ -277,13 +277,7 @@ class InventoryFifoTest extends TestCase
     {
         Sanctum::actingAs($this->owner);
 
-        $staff = User::query()->create([
-            'tenant_id' => $this->owner->tenant_id,
-            'name' => 'Staff',
-            'mobile' => '8801712345951',
-            'pin_hash' => '123456',
-        ]);
-        $staff->assignRole(Role::findByName('staff', 'web'));
+        $staff = $this->createBranchUser($this->owner, 'staff', '8801712345951', 'startup-plus');
 
         Sanctum::actingAs($staff);
 
@@ -346,7 +340,7 @@ class InventoryFifoTest extends TestCase
     private function cashPaymentMethodId(): int
     {
         return PaymentMethod::query()
-            ->where('store_id', $this->owner->tenant->store->id)
+            ->where('store_id', $this->defaultStore($this->owner)->id)
             ->where('is_credit', false)
             ->value('id');
     }

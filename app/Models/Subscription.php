@@ -15,6 +15,7 @@ class Subscription extends Model
 
     protected $fillable = [
         'tenant_id',
+        'store_id',
         'plan_id',
         'status',
         'billing_cycle',
@@ -33,6 +34,11 @@ class Subscription extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
     }
 
     public function plan(): BelongsTo

@@ -3,32 +3,30 @@
 namespace App\Services\Auth;
 
 use App\Models\PaymentMethod;
-use App\Models\Plan;
 use App\Models\Store;
 use App\Models\StoreSetting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Plans\TrialPlanService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class RegistrationService
 {
+    public function __construct(
+        private readonly TrialPlanService $trialPlanService,
+    ) {}
+
     public function register(array $data): User
     {
         return DB::transaction(function () use ($data) {
-            $shopName = trim((string) ($data['shop_name'] ?? ''));
-            if ($shopName === '') {
-                $shopName = $data['owner_name'];
-            }
-
-            $plan = Plan::query()
-                ->where('slug', $data['plan_slug'] ?? 'startup')
-                ->where('is_active', true)
-                ->firstOrFail();
+            $ownerName = trim((string) $data['owner_name']);
+            $branchName = config('retail360.default_branch_name', 'My Store');
+            $plan = $this->trialPlanService->resolveTrialPlan();
 
             $tenant = Tenant::query()->create([
-                'name' => $shopName,
-                'slug' => $this->uniqueTenantSlug($shopName),
+                'name' => $ownerName,
+                'slug' => $this->uniqueTenantSlug($ownerName),
                 'plan_id' => $plan->id,
                 'status' => Tenant::STATUS_TRIAL,
                 'trial_ends_at' => now()->addDays((int) config('retail360.trial_days', 15)),
@@ -36,7 +34,11 @@ class RegistrationService
 
             $store = Store::query()->create([
                 'tenant_id' => $tenant->id,
-                'name' => $data['store_name'] ?? $shopName,
+                'plan_id' => $plan->id,
+                'name' => $branchName,
+                'status' => Store::STATUS_TRIAL,
+                'trial_ends_at' => now()->addDays((int) config('retail360.trial_days', 15)),
+                'is_default' => true,
             ]);
 
             StoreSetting::query()->create([
@@ -55,16 +57,17 @@ class RegistrationService
             ]);
 
             $user = User::query()->create([
-                'name' => $data['owner_name'],
+                'name' => $ownerName,
                 'mobile' => $data['mobile'],
                 'pin_hash' => $data['pin'],
                 'tenant_id' => $tenant->id,
+                'default_store_id' => $store->id,
                 'is_platform_admin' => false,
             ]);
 
             $user->assignRole('owner');
 
-            return $user->load(['tenant.plan', 'tenant.store', 'roles']);
+            return $user->load(['tenant.plan', 'defaultStore.plan', 'roles']);
         });
     }
 

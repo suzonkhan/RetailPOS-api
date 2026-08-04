@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Platform;
 
-use App\Models\Tenant;
+use App\Models\Store;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -17,7 +17,8 @@ class UpdatePlatformTenantRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['sometimes', 'string', Rule::in([Tenant::STATUS_SUSPENDED, Tenant::STATUS_ACTIVE])],
+            'branch_id' => ['sometimes', 'integer', 'exists:stores,id'],
+            'status' => ['sometimes', 'string', Rule::in([Store::STATUS_SUSPENDED, Store::STATUS_ACTIVE])],
             'plan_slug' => [
                 'sometimes',
                 'string',

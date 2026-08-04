@@ -2,12 +2,17 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Branch\BranchScopeService;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureActiveSubscription
 {
+    public function __construct(
+        private readonly BranchScopeService $branchScope,
+    ) {}
+
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -23,22 +28,23 @@ class EnsureActiveSubscription
             return $next($request);
         }
 
-        $tenant = $user->tenant;
-
-        if ($tenant === null) {
+        if ($this->isBranchListRoute($request)) {
             return $next($request);
         }
 
-        $tenant->syncSubscriptionStatus();
-        $tenant->refresh();
+        $store = $this->branchScope->resolveBranch($user);
 
-        if (! $tenant->requiresSubscriptionPayment()) {
+        $store->syncSubscriptionStatus();
+        $store->refresh();
+
+        if (! $store->requiresSubscriptionPayment()) {
             return $next($request);
         }
 
         return response()->json([
             'trial_ended' => true,
-            'subscribe_url' => '/subscription/pay',
+            'branch_id' => $store->id,
+            'subscribe_url' => '/app/settings?tab=subscription',
         ], 402);
     }
 
@@ -50,7 +56,16 @@ class EnsureActiveSubscription
             'api/v1/auth/*',
             'api/v1/checkout/*',
             'api/v1/bkash/webhook',
-            'api/v1/tenant/subscription',
+            'api/v1/tenant/branches',
+            'api/v1/tenant/branches/*',
         );
+    }
+
+    private function isBranchListRoute(Request $request): bool
+    {
+        return $request->is('api/v1/tenant/branches')
+            || $request->is('api/v1/tenant/branches/*')
+            && $request->isMethod('GET')
+            && str_contains($request->path(), 'subscription');
     }
 }

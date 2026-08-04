@@ -25,15 +25,7 @@ class UserCrudTest extends TestCase
             RolePermissionSeeder::class,
         ]);
 
-        $this->postJson('/api/v1/auth/register', [
-            'shop_name' => 'User CRUD Shop',
-            'owner_name' => 'Owner',
-            'mobile' => '8801712345700',
-            'pin' => '123456',
-            'plan_slug' => 'startup',
-        ])->assertCreated();
-
-        $this->owner = User::query()->where('mobile', '8801712345700')->firstOrFail();
+        $this->owner = $this->registerOwner('8801712345710');
     }
 
     public function test_owner_can_list_and_create_users(): void
@@ -42,13 +34,12 @@ class UserCrudTest extends TestCase
 
         $this->getJson('/api/v1/users')
             ->assertOk()
-            ->assertJsonPath('meta.max_users', 1)
+            ->assertJsonPath('meta.max_users', 2)
             ->assertJsonPath('meta.can_add_user', false)
             ->assertJsonCount(1, 'data');
 
-        $this->owner->tenant->update([
-            'plan_id' => Plan::query()->where('slug', 'startup-plus')->value('id'),
-        ]);
+        $this->upgradeTenantPlan($this->owner, 'startup-plus');
+        $this->activateDefaultBranch($this->owner, 'startup-plus');
 
         $this->getJson('/api/v1/users')
             ->assertJsonPath('meta.can_add_user', true);
@@ -69,12 +60,21 @@ class UserCrudTest extends TestCase
 
     public function test_startup_plan_blocks_second_user(): void
     {
+        $this->activateDefaultBranch($this->owner, 'startup');
+
         Sanctum::actingAs($this->owner);
 
         $this->postJson('/api/v1/users', [
-            'name' => 'Extra User',
+            'name' => 'First Staff',
             'mobile' => '8801712345702',
             'pin' => '222222',
+            'role' => 'staff',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/users', [
+            'name' => 'Extra User',
+            'mobile' => '8801712345704',
+            'pin' => '222223',
             'role' => 'staff',
         ])->assertUnprocessable()
             ->assertJsonValidationErrors(['mobile']);
@@ -82,7 +82,8 @@ class UserCrudTest extends TestCase
 
     public function test_owner_can_update_and_delete_user_on_plus_plan(): void
     {
-        $this->owner->tenant->update(['plan_id' => Plan::query()->where('slug', 'startup-plus')->value('id')]);
+        $this->upgradeTenantPlan($this->owner, 'startup-plus');
+        $this->activateDefaultBranch($this->owner, 'startup-plus');
 
         Sanctum::actingAs($this->owner);
 

@@ -38,7 +38,7 @@ class PlatformTenantController extends Controller
     public function store(CreatePlatformTenantRequest $request): JsonResponse
     {
         $tenant = $this->platformTenants->create($request->validated());
-        $tenant->load(['plan', 'store']);
+        $tenant->load(['stores.plan']);
 
         return PlatformTenantDetailResource::make($tenant)
             ->response()
@@ -47,7 +47,7 @@ class PlatformTenantController extends Controller
 
     public function show(Tenant $tenant): PlatformTenantDetailResource
     {
-        $tenant->load(['plan', 'store']);
+        $tenant->load(['stores.plan']);
 
         return PlatformTenantDetailResource::make($tenant);
     }
@@ -65,7 +65,7 @@ class PlatformTenantController extends Controller
     {
         $this->platformTenants->resetOwnerPin($tenant, $request->validated('pin'));
 
-        $tenant->load(['plan', 'store']);
+        $tenant->load(['stores.plan']);
 
         return PlatformTenantDetailResource::make($tenant)
             ->response()

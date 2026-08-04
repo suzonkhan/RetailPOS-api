@@ -15,10 +15,11 @@ class PlanSeeder extends Seeder
                 'slug' => 'startup',
                 'monthly_price' => 20,
                 'yearly_price' => 240,
-                'max_users' => 1,
+                'max_users' => 2,
                 'max_stores' => 1,
                 'max_categories' => 15,
                 'max_products' => 200,
+                'is_trial_default' => true,
             ],
             [
                 'name' => 'Startup Plus',
@@ -29,6 +30,7 @@ class PlanSeeder extends Seeder
                 'max_stores' => 1,
                 'max_categories' => 25,
                 'max_products' => 500,
+                'is_trial_default' => false,
             ],
             [
                 'name' => 'Startup Pro',
@@ -39,6 +41,7 @@ class PlanSeeder extends Seeder
                 'max_stores' => 1,
                 'max_categories' => 40,
                 'max_products' => 1000,
+                'is_trial_default' => false,
             ],
         ];
 

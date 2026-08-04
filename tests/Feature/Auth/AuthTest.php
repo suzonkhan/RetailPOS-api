@@ -62,7 +62,11 @@ class AuthTest extends TestCase
         $response->assertCreated();
 
         $this->assertDatabaseHas('tenants', [
-            'name' => 'Demo Shop',
+            'name' => 'Owner One',
+        ]);
+
+        $this->assertDatabaseHas('stores', [
+            'name' => 'My Store',
         ]);
     }
 

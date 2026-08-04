@@ -4,50 +4,50 @@ namespace App\Services\Catalog;
 
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\Tenant;
+use App\Models\Store;
 use Illuminate\Validation\ValidationException;
 
 class CatalogPlanLimitService
 {
-    public function categoryCount(Tenant $tenant): int
+    public function categoryCount(Store $store): int
     {
         return Category::query()
-            ->where('tenant_id', $tenant->id)
+            ->where('store_id', $store->id)
             ->count();
     }
 
-    public function productCount(Tenant $tenant): int
+    public function productCount(Store $store): int
     {
         return Product::query()
-            ->where('tenant_id', $tenant->id)
+            ->where('store_id', $store->id)
             ->count();
     }
 
-    public function canAddCategory(Tenant $tenant): bool
+    public function canAddCategory(Store $store): bool
     {
-        $plan = $tenant->plan;
+        $plan = $store->plan;
 
         if ($plan === null) {
             return false;
         }
 
-        return $this->categoryCount($tenant) < $plan->max_categories;
+        return $this->categoryCount($store) < $plan->max_categories;
     }
 
-    public function canAddProduct(Tenant $tenant): bool
+    public function canAddProduct(Store $store): bool
     {
-        $plan = $tenant->plan;
+        $plan = $store->plan;
 
         if ($plan === null) {
             return false;
         }
 
-        return $this->productCount($tenant) < $plan->max_products;
+        return $this->productCount($store) < $plan->max_products;
     }
 
-    public function assertCanAddCategory(Tenant $tenant): void
+    public function assertCanAddCategory(Store $store): void
     {
-        if ($this->canAddCategory($tenant)) {
+        if ($this->canAddCategory($store)) {
             return;
         }
 
@@ -56,9 +56,9 @@ class CatalogPlanLimitService
         ]);
     }
 
-    public function assertCanAddProduct(Tenant $tenant): void
+    public function assertCanAddProduct(Store $store): void
     {
-        if ($this->canAddProduct($tenant)) {
+        if ($this->canAddProduct($store)) {
             return;
         }
 
