@@ -6,6 +6,7 @@ use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\StockMovement;
+use App\Models\Store;
 use App\Models\User;
 use Database\Seeders\PlanSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -316,6 +317,146 @@ class SyncTest extends TestCase
         $this->getJson('/api/v1/sync/pull?since=2020-01-01T00:00:00Z&device_id='.$deviceId)
             ->assertOk()
             ->assertJsonStructure(['synced_at', 'settings']);
+    }
+
+    public function test_pull_include_filter_returns_only_requested_entities(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson('/api/v1/devices', [
+            'device_id' => $this->deviceId,
+            'name' => 'Filter Device',
+        ])->assertCreated();
+
+        $response = $this->getJson('/api/v1/sync/pull?'.http_build_query([
+            'since' => '2020-01-01T00:00:00Z',
+            'device_id' => $this->deviceId,
+            'include' => 'settings,payment_methods,stock,customers',
+        ]))->assertOk();
+
+        $json = $response->json();
+        $this->assertArrayHasKey('settings', $json);
+        $this->assertArrayHasKey('payment_methods', $json);
+        $this->assertArrayHasKey('stock', $json);
+        $this->assertArrayHasKey('customers', $json);
+        $this->assertArrayNotHasKey('products', $json);
+        $this->assertArrayNotHasKey('categories', $json);
+        $this->assertArrayNotHasKey('brands', $json);
+    }
+
+    public function test_pull_rejects_invalid_include_entities(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson('/api/v1/devices', [
+            'device_id' => $this->deviceId,
+            'name' => 'Invalid Include Device',
+        ])->assertCreated();
+
+        $this->getJson('/api/v1/sync/pull?'.http_build_query([
+            'since' => '2020-01-01T00:00:00Z',
+            'device_id' => $this->deviceId,
+            'include' => 'settings,nope',
+        ]))->assertUnprocessable()
+            ->assertJsonValidationErrors(['include']);
+    }
+
+    public function test_pull_stock_payload_is_lightweight(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson('/api/v1/devices', [
+            'device_id' => $this->deviceId,
+            'name' => 'Stock Device',
+        ])->assertCreated();
+
+        $categoryId = $this->createCategory();
+        $product = $this->postJson('/api/v1/products', [
+            'name' => 'Stock Sync Product',
+            'category_id' => $categoryId,
+            'selling_price' => 40,
+            'uom' => 'pcs',
+            'manage_inventory' => true,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/stock-adjustments', [
+            'product_id' => $product->json('id'),
+            'quantity_delta' => 7,
+            'unit_cost' => 0,
+            'reason' => 'Seed',
+        ])->assertCreated();
+
+        $response = $this->getJson('/api/v1/sync/pull?'.http_build_query([
+            'since' => '2020-01-01T00:00:00Z',
+            'device_id' => $this->deviceId,
+            'include' => 'stock',
+        ]))->assertOk();
+
+        $this->assertArrayNotHasKey('products', $response->json());
+        $stock = collect($response->json('stock'));
+        $row = $stock->firstWhere('product_uuid', $product->json('uuid'));
+        $this->assertNotNull($row);
+        $this->assertSame(7.0, (float) $row['stock_quantity']);
+        $this->assertArrayHasKey('product_variant_uuid', $row);
+        $this->assertArrayNotHasKey('name', $row);
+        $this->assertArrayNotHasKey('image_url', $row);
+    }
+
+    public function test_pull_is_branch_scoped_for_catalog(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson('/api/v1/devices', [
+            'device_id' => $this->deviceId,
+            'name' => 'Branch Scope Device',
+        ])->assertCreated();
+
+        $homeStoreId = $this->owner->default_store_id
+            ?? $this->owner->stores()->first()?->id
+            ?? Store::query()->where('tenant_id', $this->owner->tenant_id)->value('id');
+
+        // Create product on home branch
+        $categoryId = $this->createCategory();
+        $homeProductUuid = $this->postJson('/api/v1/products', [
+            'name' => 'Home Branch Product',
+            'category_id' => $categoryId,
+            'selling_price' => 10,
+            'uom' => 'pcs',
+        ])->assertCreated()->json('uuid');
+
+        // Simulate another branch product by cloning store-scoped row if multi-branch exists;
+        // otherwise skip cross-branch assertion when only one store.
+        $otherStore = Store::query()
+            ->where('tenant_id', $this->owner->tenant_id)
+            ->where('id', '!=', $homeStoreId)
+            ->first();
+
+        if ($otherStore !== null) {
+            $foreign = Product::query()->create([
+                'uuid' => (string) Str::uuid(),
+                'tenant_id' => $this->owner->tenant_id,
+                'store_id' => $otherStore->id,
+                'name' => 'Other Branch Product',
+                'selling_price' => 10,
+                'uom' => 'pcs',
+                'stock_quantity' => 0,
+                'is_active' => true,
+                'manage_inventory' => false,
+                'has_variants' => false,
+            ]);
+
+            $pull = $this->getJson('/api/v1/sync/pull?'.$this->pullQuery(Carbon::parse('2020-01-01T00:00:00Z')))
+                ->assertOk();
+
+            $uuids = collect($pull->json('products'))->pluck('uuid');
+            $this->assertTrue($uuids->contains($homeProductUuid));
+            $this->assertFalse($uuids->contains($foreign->uuid));
+        } else {
+            $pull = $this->getJson('/api/v1/sync/pull?'.$this->pullQuery(Carbon::parse('2020-01-01T00:00:00Z')))
+                ->assertOk();
+            $uuids = collect($pull->json('products'))->pluck('uuid');
+            $this->assertTrue($uuids->contains($homeProductUuid));
+        }
     }
 
     private function pullQuery(Carbon $since): string

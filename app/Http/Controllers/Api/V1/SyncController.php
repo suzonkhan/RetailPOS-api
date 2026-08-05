@@ -28,7 +28,13 @@ class SyncController extends Controller
         $since = Carbon::parse($validated['since'])->utc();
 
         return response()->json(
-            $this->pullService->pull($request->user(), $device, $since)
+            $this->pullService->pull(
+                $request->user(),
+                $device,
+                $since,
+                $request->includedEntities(),
+                $request->includeImages(),
+            )
         );
     }
 
