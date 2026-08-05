@@ -41,8 +41,13 @@ class AuthTest extends TestCase
             ->assertJsonStructure(['token', 'permissions', 'tenant', 'store']);
 
         $this->assertDatabaseHas('tenants', [
-            'name' => 'Owner One',
+            'name' => "Owner One's Store",
             'status' => Tenant::STATUS_TRIAL,
+        ]);
+
+        $this->assertDatabaseHas('stores', [
+            'name' => 'main branch',
+            'is_default' => true,
         ]);
 
         $tenant = Tenant::query()->first();
@@ -62,11 +67,11 @@ class AuthTest extends TestCase
         $response->assertCreated();
 
         $this->assertDatabaseHas('tenants', [
-            'name' => 'Owner One',
+            'name' => "Owner One's Store",
         ]);
 
         $this->assertDatabaseHas('stores', [
-            'name' => 'My Store',
+            'name' => 'main branch',
         ]);
     }
 

@@ -32,7 +32,7 @@ class BranchBillingTest extends TestCase
 
         $store = $this->defaultStore($owner);
 
-        $this->assertSame('My Store', $store->name);
+        $this->assertSame('main branch', $store->name);
         $this->assertTrue($store->is_default);
         $this->assertSame(Store::STATUS_TRIAL, $store->status);
         $this->assertSame('startup', $store->plan->slug);
@@ -171,7 +171,7 @@ class BranchBillingTest extends TestCase
         $this->getJson('/api/v1/tenant/branches')
             ->assertOk()
             ->assertJsonCount(1)
-            ->assertJsonPath('0.name', 'My Store');
+            ->assertJsonPath('0.name', 'main branch');
     }
 
     public function test_set_default_branch_persists_for_owner(): void

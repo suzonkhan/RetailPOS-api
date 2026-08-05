@@ -199,9 +199,10 @@ class PlatformTenantTest extends TestCase
         ]);
 
         $response->assertCreated()
-            ->assertJsonPath('name', 'New Owner')
+            ->assertJsonPath('name', "New Owner's Store")
             ->assertJsonPath('owner.mobile', '8801712345610')
-            ->assertJsonPath('branches.0.plan.slug', 'startup');
+            ->assertJsonPath('branches.0.plan.slug', 'startup')
+            ->assertJsonPath('branches.0.name', 'main branch');
 
         $this->assertDatabaseHas('users', [
             'mobile' => '8801712345610',

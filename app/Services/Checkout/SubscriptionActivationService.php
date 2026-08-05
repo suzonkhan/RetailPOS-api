@@ -83,7 +83,7 @@ class SubscriptionActivationService
         $store = Store::query()->create([
             'tenant_id' => $invoice->tenant_id,
             'plan_id' => $invoice->plan_id,
-            'name' => $meta['name'] ?? config('retail360.default_branch_name', 'My Store'),
+            'name' => $meta['name'] ?? config('retail360.default_branch_name', 'main branch'),
             'phone' => $meta['phone'] ?? null,
             'address' => $meta['address'] ?? null,
             'status' => Store::STATUS_ACTIVE,

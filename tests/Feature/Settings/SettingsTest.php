@@ -41,7 +41,7 @@ class SettingsTest extends TestCase
 
         $this->getJson('/api/v1/tenant/settings')
             ->assertOk()
-            ->assertJsonPath('name', 'My Store')
+            ->assertJsonPath('name', 'main branch')
             ->assertJsonPath('vat_adjust_on_sale', false)
             ->assertJsonStructure(['uuid', 'store_id', 'updated_at']);
 

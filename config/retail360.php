@@ -6,7 +6,7 @@ return [
 
     'trial_plan_slug' => env('RETAIL360_TRIAL_PLAN', 'startup'),
 
-    'default_branch_name' => env('RETAIL360_DEFAULT_BRANCH_NAME', 'My Store'),
+    'default_branch_name' => env('RETAIL360_DEFAULT_BRANCH_NAME', 'main branch'),
 
     'expired_branch_purge_days' => (int) env('RETAIL360_EXPIRED_BRANCH_PURGE_DAYS', 30),
 

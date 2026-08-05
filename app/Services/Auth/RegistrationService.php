@@ -21,12 +21,13 @@ class RegistrationService
     {
         return DB::transaction(function () use ($data) {
             $ownerName = trim((string) $data['owner_name']);
-            $branchName = config('retail360.default_branch_name', 'My Store');
+            $storeName = $ownerName."'s Store";
+            $branchName = config('retail360.default_branch_name', 'main branch');
             $plan = $this->trialPlanService->resolveTrialPlan();
 
             $tenant = Tenant::query()->create([
-                'name' => $ownerName,
-                'slug' => $this->uniqueTenantSlug($ownerName),
+                'name' => $storeName,
+                'slug' => $this->uniqueTenantSlug($storeName),
                 'plan_id' => $plan->id,
                 'status' => Tenant::STATUS_TRIAL,
                 'trial_ends_at' => now()->addDays((int) config('retail360.trial_days', 15)),
