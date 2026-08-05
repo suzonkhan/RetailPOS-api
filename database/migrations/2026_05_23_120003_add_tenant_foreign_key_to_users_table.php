@@ -13,12 +13,19 @@ return new class extends Migration
                 ->references('id')
                 ->on('tenants')
                 ->nullOnDelete();
+
+            $table->foreignId('default_store_id')
+                ->nullable()
+                ->after('tenant_id')
+                ->constrained('stores')
+                ->nullOnDelete();
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('default_store_id');
             $table->dropForeign(['tenant_id']);
         });
     }

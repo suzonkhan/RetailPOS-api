@@ -38,10 +38,6 @@ return new class extends Migration
             $table->index(['variation_attribute_id', 'sort_order'], 'var_attr_vals_attr_sort_idx');
         });
 
-        Schema::table('products', function (Blueprint $table) {
-            $table->boolean('has_variants')->default(false)->after('is_active');
-        });
-
         Schema::create('product_variation_attributes', function (Blueprint $table) {
             $table->id();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
@@ -123,21 +119,17 @@ return new class extends Migration
                 ->constrained('product_variants')->nullOnDelete();
         });
 
-        if (Schema::hasTable('stock_movements')) {
-            Schema::table('stock_movements', function (Blueprint $table) {
-                $table->foreignId('product_variant_id')->nullable()->after('product_id')
-                    ->constrained('product_variants')->nullOnDelete();
-            });
-        }
+        Schema::table('stock_movements', function (Blueprint $table) {
+            $table->foreignId('product_variant_id')->nullable()->after('product_id')
+                ->constrained('product_variants')->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
-        if (Schema::hasTable('stock_movements')) {
-            Schema::table('stock_movements', function (Blueprint $table) {
-                $table->dropConstrainedForeignId('product_variant_id');
-            });
-        }
+        Schema::table('stock_movements', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('product_variant_id');
+        });
 
         Schema::table('stock_adjustments', function (Blueprint $table) {
             $table->dropConstrainedForeignId('product_variant_id');
@@ -161,11 +153,6 @@ return new class extends Migration
         Schema::dropIfExists('product_variants');
         Schema::dropIfExists('product_variation_values');
         Schema::dropIfExists('product_variation_attributes');
-
-        Schema::table('products', function (Blueprint $table) {
-            $table->dropColumn('has_variants');
-        });
-
         Schema::dropIfExists('variation_attribute_values');
         Schema::dropIfExists('variation_attributes');
     }

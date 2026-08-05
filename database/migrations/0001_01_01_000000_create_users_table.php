@@ -17,6 +17,8 @@ return new class extends Migration
             $table->string('mobile', 20)->unique();
             $table->string('email')->nullable()->unique();
             $table->string('pin_hash');
+            $table->unsignedSmallInteger('failed_login_attempts')->default(0);
+            $table->timestamp('locked_until')->nullable();
             $table->foreignId('tenant_id')->nullable()->index();
             $table->boolean('is_platform_admin')->default(false);
             $table->rememberToken();

@@ -66,8 +66,15 @@ return new class extends Migration
             $table->decimal('selling_price', 12, 2)->default(0);
             $table->decimal('cost_price', 12, 2)->nullable();
             $table->decimal('stock_quantity', 12, 3)->default(0);
+            $table->decimal('min_stock_quantity', 12, 3)->nullable();
+            $table->date('expiration_date')->nullable();
+            $table->string('uom', 16)->default('pcs');
             $table->decimal('vat_rate', 8, 2)->nullable();
             $table->string('vat_type', 16)->nullable();
+            $table->boolean('has_variants')->default(false);
+            $table->boolean('is_negotiable')->default(false);
+            $table->boolean('ask_qty_on_add')->default(false);
+            $table->boolean('manage_inventory')->default(false);
             $table->boolean('is_active')->default(true);
             $table->timestamps();
             $table->softDeletes();

@@ -29,18 +29,23 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique();
             $table->uuid('client_uuid');
+            $table->unsignedBigInteger('order_number')->default(0);
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('store_id')->constrained()->cascadeOnDelete();
             $table->foreignId('customer_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('updated_by')->nullable()->constrained('users')->nullOnDelete();
             $table->decimal('subtotal', 12, 2)->default(0);
             $table->decimal('vat_total', 12, 2)->default(0);
+            $table->decimal('discount_amount', 12, 2)->default(0);
             $table->decimal('total', 12, 2)->default(0);
+            $table->decimal('change_amount', 12, 2)->default(0);
             $table->string('status', 32)->default('completed');
             $table->timestamps();
             $table->softDeletes();
 
             $table->unique(['tenant_id', 'client_uuid']);
+            $table->unique(['tenant_id', 'order_number']);
             $table->index(['tenant_id', 'updated_at']);
             $table->index(['store_id', 'created_at']);
         });

@@ -19,6 +19,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('max_categories');
             $table->unsignedInteger('max_products');
             $table->boolean('is_active')->default(true);
+            $table->boolean('is_trial_default')->default(false);
             $table->timestamps();
         });
     }

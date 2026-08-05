@@ -17,6 +17,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->unsignedInteger('sort_order')->default(0);
             $table->boolean('requires_reference')->default(false);
+            $table->boolean('is_credit')->default(false);
             $table->timestamps();
             $table->softDeletes();
 

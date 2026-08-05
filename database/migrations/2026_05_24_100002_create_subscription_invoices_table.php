@@ -11,6 +11,9 @@ return new class extends Migration
         Schema::create('subscription_invoices', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('store_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->string('intent')->default('renew');
+            $table->json('branch_meta')->nullable();
             $table->foreignId('plan_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
             $table->foreignId('coupon_id')->nullable()->constrained()->nullOnDelete();
             $table->string('billing_cycle');

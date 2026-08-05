@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::create('subscriptions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('store_id')->nullable()->constrained()->cascadeOnDelete();
             $table->foreignId('plan_id')->constrained()->cascadeOnUpdate()->restrictOnDelete();
             $table->string('status');
             $table->string('billing_cycle');
@@ -19,6 +20,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['tenant_id', 'status']);
+            $table->index(['store_id', 'status']);
         });
     }
 

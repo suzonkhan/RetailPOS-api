@@ -18,6 +18,7 @@ return new class extends Migration
             $table->timestamp('subscribed_at')->nullable();
             $table->timestamp('current_period_ends_at')->nullable();
             $table->string('billing_cycle')->nullable();
+            $table->unsignedBigInteger('last_order_number')->default(0);
             $table->timestamps();
 
             $table->index(['status', 'trial_ends_at']);
