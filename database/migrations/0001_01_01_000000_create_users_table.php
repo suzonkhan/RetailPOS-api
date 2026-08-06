@@ -20,6 +20,7 @@ return new class extends Migration
             $table->unsignedSmallInteger('failed_login_attempts')->default(0);
             $table->timestamp('locked_until')->nullable();
             $table->foreignId('tenant_id')->nullable()->index();
+            $table->foreignId('default_store_id')->nullable()->index();
             $table->boolean('is_platform_admin')->default(false);
             $table->rememberToken();
             $table->timestamps();

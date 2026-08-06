@@ -53,6 +53,7 @@ return new class extends Migration
             $table->foreignId('expense_category_id')->constrained('expense_categories')->restrictOnDelete();
             $table->foreignId('staff_id')->nullable()->constrained('staff')->nullOnDelete();
             $table->foreignId('supplier_id')->nullable()->constrained('suppliers')->nullOnDelete();
+            $table->foreignId('purchase_id')->nullable()->constrained('purchases')->nullOnDelete();
             $table->string('title');
             $table->decimal('amount', 12, 2);
             $table->date('expense_date');
@@ -64,6 +65,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'updated_at']);
             $table->index(['store_id', 'expense_date']);
             $table->index(['staff_id', 'expense_date']);
+            $table->index(['purchase_id', 'expense_date']);
         });
     }
 

@@ -259,8 +259,8 @@ class ReportsTest extends TestCase
             ->assertJsonPath('cogs', 80)
             ->assertJsonPath('gross_profit', 120)
             ->assertJsonPath('profit_margin_percent', 60)
-            ->assertJsonPath('expenses_total', 50)
-            ->assertJsonPath('net_profit', 70);
+            ->assertJsonPath('expenses_total', 450)
+            ->assertJsonPath('net_profit', -330);
     }
 
     public function test_reports_exclude_other_tenant_data(): void
@@ -422,7 +422,7 @@ class ReportsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('total_orders', 1)
             ->assertJsonPath('total_sales', 200)
-            ->assertJsonPath('total_expenses', 25)
+            ->assertJsonPath('total_expenses', 225)
             ->assertJsonPath('low_stock_items', 1);
 
         $this->getJson("/api/v1/reports/daily-sales?date={$from}")
@@ -452,8 +452,10 @@ class ReportsTest extends TestCase
 
         $this->getJson("/api/v1/reports/expenses?from={$from}&to={$to}")
             ->assertOk()
-            ->assertJsonPath('total_amount', 25)
-            ->assertJsonPath('data.0.description', 'Electricity');
+            ->assertJsonPath('total_amount', 225)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonFragment(['description' => 'Electricity'])
+            ->assertJsonFragment(['description' => 'PUR-0001']);
 
         $this->getJson('/api/v1/reports/customer-dues')
             ->assertOk()

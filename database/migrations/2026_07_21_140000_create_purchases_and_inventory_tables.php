@@ -34,8 +34,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('purchase_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->string('product_name');
             $table->string('product_sku')->nullable();
+            $table->string('variant_label')->nullable();
             $table->decimal('quantity', 12, 3);
             $table->decimal('unit_cost', 12, 2);
             $table->decimal('line_total', 12, 2);
@@ -49,6 +51,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('store_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->foreignId('purchase_item_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamp('received_at');
             $table->date('expiration_date')->nullable();
@@ -67,6 +70,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('store_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->decimal('quantity_delta', 12, 3);
             $table->string('reason')->nullable();
             $table->decimal('unit_cost', 12, 2)->nullable();
@@ -76,10 +80,6 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'updated_at']);
             $table->index(['store_id', 'created_at']);
-        });
-
-        Schema::table('sale_items', function (Blueprint $table) {
-            $table->decimal('unit_cost', 12, 2)->nullable()->after('unit_price');
         });
 
         Schema::create('sale_item_lot_allocations', function (Blueprint $table) {
@@ -117,10 +117,6 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('sale_item_lot_allocations');
-
-        Schema::table('sale_items', function (Blueprint $table) {
-            $table->dropColumn('unit_cost');
-        });
 
         Schema::dropIfExists('stock_adjustments');
         Schema::dropIfExists('stock_lots');

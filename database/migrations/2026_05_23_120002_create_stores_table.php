@@ -38,10 +38,27 @@ return new class extends Migration
             $table->unique(['store_id', 'user_id']);
             $table->index('user_id');
         });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreign('tenant_id')
+                ->references('id')
+                ->on('tenants')
+                ->nullOnDelete();
+
+            $table->foreign('default_store_id')
+                ->references('id')
+                ->on('stores')
+                ->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropForeign(['tenant_id']);
+            $table->dropForeign(['default_store_id']);
+        });
+
         Schema::dropIfExists('store_user');
         Schema::dropIfExists('stores');
     }

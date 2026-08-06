@@ -96,59 +96,10 @@ return new class extends Migration
                 'product_variant_options_unique'
             );
         });
-
-        Schema::table('sale_items', function (Blueprint $table) {
-            $table->foreignId('product_variant_id')->nullable()->after('product_id')
-                ->constrained('product_variants')->nullOnDelete();
-            $table->string('variant_label')->nullable()->after('product_sku');
-        });
-
-        Schema::table('purchase_items', function (Blueprint $table) {
-            $table->foreignId('product_variant_id')->nullable()->after('product_id')
-                ->constrained('product_variants')->nullOnDelete();
-            $table->string('variant_label')->nullable()->after('product_sku');
-        });
-
-        Schema::table('stock_lots', function (Blueprint $table) {
-            $table->foreignId('product_variant_id')->nullable()->after('product_id')
-                ->constrained('product_variants')->nullOnDelete();
-        });
-
-        Schema::table('stock_adjustments', function (Blueprint $table) {
-            $table->foreignId('product_variant_id')->nullable()->after('product_id')
-                ->constrained('product_variants')->nullOnDelete();
-        });
-
-        Schema::table('stock_movements', function (Blueprint $table) {
-            $table->foreignId('product_variant_id')->nullable()->after('product_id')
-                ->constrained('product_variants')->nullOnDelete();
-        });
     }
 
     public function down(): void
     {
-        Schema::table('stock_movements', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('product_variant_id');
-        });
-
-        Schema::table('stock_adjustments', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('product_variant_id');
-        });
-
-        Schema::table('stock_lots', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('product_variant_id');
-        });
-
-        Schema::table('purchase_items', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('product_variant_id');
-            $table->dropColumn('variant_label');
-        });
-
-        Schema::table('sale_items', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('product_variant_id');
-            $table->dropColumn('variant_label');
-        });
-
         Schema::dropIfExists('product_variant_options');
         Schema::dropIfExists('product_variants');
         Schema::dropIfExists('product_variation_values');

@@ -54,10 +54,13 @@ return new class extends Migration
             $table->id();
             $table->foreignId('sale_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->string('product_name');
             $table->string('product_sku')->nullable();
+            $table->string('variant_label')->nullable();
             $table->decimal('quantity', 12, 3);
             $table->decimal('unit_price', 12, 2);
+            $table->decimal('unit_cost', 12, 2)->nullable();
             $table->decimal('line_subtotal', 12, 2);
             $table->decimal('vat_rate', 8, 2)->default(0);
             $table->string('vat_type', 16)->nullable();
@@ -146,6 +149,7 @@ return new class extends Migration
             $table->foreignId('tenant_id')->constrained()->cascadeOnDelete();
             $table->foreignId('store_id')->constrained()->cascadeOnDelete();
             $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('product_variant_id')->nullable()->constrained('product_variants')->nullOnDelete();
             $table->string('type', 32);
             $table->decimal('quantity_delta', 12, 3);
             $table->decimal('quantity_after', 12, 3);

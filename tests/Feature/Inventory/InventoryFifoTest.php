@@ -3,6 +3,7 @@
 namespace Tests\Feature\Inventory;
 
 use App\Models\ExpenseCategory;
+use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\SaleItemLotAllocation;
 use App\Models\StockLot;
@@ -285,8 +286,8 @@ class InventoryFifoTest extends TestCase
             ->assertJsonPath('cogs', 80)
             ->assertJsonPath('gross_revenue', 200)
             ->assertJsonPath('gross_profit', 120)
-            ->assertJsonPath('expenses_total', 0)
-            ->assertJsonPath('net_profit', 120);
+            ->assertJsonPath('expenses_total', 400)
+            ->assertJsonPath('net_profit', -280);
     }
 
     public function test_staff_cannot_manage_purchases(): void
