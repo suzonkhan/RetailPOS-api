@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Catalog\CatalogScopeService;
 use App\Services\Catalog\ProductVariantService;
+use App\Services\Expenses\ExpenseService;
 use App\Services\Sales\StockMovementService;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -24,6 +25,7 @@ class PurchaseService
         private readonly LotService $lots,
         private readonly StockMovementService $stockMovement,
         private readonly ProductVariantService $variantService,
+        private readonly ExpenseService $expenses,
     ) {}
 
     public function listForUser(User $user, array $filters): LengthAwarePaginator
@@ -199,6 +201,8 @@ class PurchaseService
 
                 $this->lots->refreshProductStockMeta($product, $variant);
             }
+
+            $this->expenses->createFromPurchase($user, $purchase);
 
             return $purchase->load(['supplier', 'creator', 'items.product']);
         });

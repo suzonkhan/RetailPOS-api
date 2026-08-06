@@ -4,6 +4,7 @@ namespace App\Services\Expenses;
 
 use App\Models\Expense;
 use App\Models\ExpenseCategory;
+use App\Models\Purchase;
 use App\Models\Staff;
 use App\Models\User;
 use App\Services\Catalog\CatalogScopeService;
@@ -21,10 +22,10 @@ class ExpenseService
     public function listForUser(User $user, array $filters = []): LengthAwarePaginator
     {
         $store = $this->catalogScope->resolveStore($user);
-        $this->categories->ensureStaffSalaryCategory($store);
+        $this->categories->ensureSystemCategories($store);
 
         $query = Expense::query()
-            ->with(['category', 'staff', 'supplier'])
+            ->with(['category', 'staff', 'supplier', 'purchase'])
             ->where('store_id', $store->id);
 
         $this->applyFilters($query, $filters);
@@ -58,9 +59,21 @@ class ExpenseService
             ]);
         }
 
+        if ($category->isPurchases()) {
+            throw ValidationException::withMessages([
+                'expense_category_id' => ['Purchase expenses are recorded automatically when you save a purchase.'],
+            ]);
+        }
+
         if (! empty($data['staff_id'])) {
             throw ValidationException::withMessages([
                 'staff_id' => ['Staff can only be linked when recording salary payments.'],
+            ]);
+        }
+
+        if (! empty($data['purchase_id'])) {
+            throw ValidationException::withMessages([
+                'purchase_id' => ['Purchases can only be linked when recording inventory purchases.'],
             ]);
         }
 
@@ -76,12 +89,33 @@ class ExpenseService
             'expense_category_id' => $category->id,
             'staff_id' => null,
             'supplier_id' => $data['supplier_id'] ?? null,
+            'purchase_id' => null,
             'title' => $data['title'],
             'amount' => $data['amount'],
             'expense_date' => $data['expense_date'],
             'notes' => $data['notes'] ?? null,
             'created_by' => $user->id,
-        ])->load(['category', 'staff', 'supplier']);
+        ])->load(['category', 'staff', 'supplier', 'purchase']);
+    }
+
+    public function createFromPurchase(User $user, Purchase $purchase): Expense
+    {
+        $store = $this->catalogScope->resolveStore($user);
+        $category = $this->categories->ensurePurchasesCategory($store);
+
+        return Expense::query()->create([
+            'tenant_id' => $user->tenant_id,
+            'store_id' => $store->id,
+            'expense_category_id' => $category->id,
+            'staff_id' => null,
+            'supplier_id' => $purchase->supplier_id,
+            'purchase_id' => $purchase->id,
+            'title' => $purchase->purchase_number,
+            'amount' => $purchase->total,
+            'expense_date' => $purchase->purchased_at->toDateString(),
+            'notes' => $purchase->notes,
+            'created_by' => $user->id,
+        ])->load(['category', 'staff', 'supplier', 'purchase']);
     }
 
     public function createStaffPayment(User $user, Staff $staff, array $data): Expense
@@ -101,19 +135,20 @@ class ExpenseService
             'expense_category_id' => $category->id,
             'staff_id' => $staff->id,
             'supplier_id' => null,
+            'purchase_id' => null,
             'title' => $title,
             'amount' => $data['amount'],
             'expense_date' => $data['expense_date'],
             'notes' => $data['notes'] ?? null,
             'created_by' => $user->id,
-        ])->load(['category', 'staff', 'supplier']);
+        ])->load(['category', 'staff', 'supplier', 'purchase']);
     }
 
     public function findForUser(User $user, Expense $expense): Expense
     {
         $this->authorize($user, $expense);
 
-        return $expense->load(['category', 'staff', 'supplier']);
+        return $expense->load(['category', 'staff', 'supplier', 'purchase']);
     }
 
     public function updateForUser(User $user, Expense $expense, array $data): Expense
@@ -123,24 +158,45 @@ class ExpenseService
         $expense->loadMissing('category');
 
         $isSalary = $expense->category?->isStaffSalary() ?? false;
+        $isPurchase = $expense->category?->isPurchases() ?? false;
 
-        if ($isSalary) {
+        if ($isSalary || $isPurchase) {
             if (isset($data['expense_category_id']) && (int) $data['expense_category_id'] !== (int) $expense->expense_category_id) {
                 throw ValidationException::withMessages([
-                    'expense_category_id' => ['Staff Salary category cannot be changed.'],
+                    'expense_category_id' => [
+                        $isSalary
+                            ? 'Staff Salary category cannot be changed.'
+                            : 'Purchases category cannot be changed.',
+                    ],
                 ]);
             }
 
-            if (array_key_exists('supplier_id', $data) && $data['supplier_id'] !== null) {
-                throw ValidationException::withMessages([
-                    'supplier_id' => ['Salary expenses cannot have a supplier.'],
-                ]);
+            if ($isSalary) {
+                if (array_key_exists('supplier_id', $data) && $data['supplier_id'] !== null) {
+                    throw ValidationException::withMessages([
+                        'supplier_id' => ['Salary expenses cannot have a supplier.'],
+                    ]);
+                }
+
+                if (array_key_exists('staff_id', $data) && (int) $data['staff_id'] !== (int) $expense->staff_id) {
+                    throw ValidationException::withMessages([
+                        'staff_id' => ['Staff cannot be changed on a salary payment.'],
+                    ]);
+                }
             }
 
-            if (array_key_exists('staff_id', $data) && (int) $data['staff_id'] !== (int) $expense->staff_id) {
-                throw ValidationException::withMessages([
-                    'staff_id' => ['Staff cannot be changed on a salary payment.'],
-                ]);
+            if ($isPurchase) {
+                if (array_key_exists('supplier_id', $data) && (int) ($data['supplier_id'] ?? 0) !== (int) $expense->supplier_id) {
+                    throw ValidationException::withMessages([
+                        'supplier_id' => ['Vendor cannot be changed on a purchase expense.'],
+                    ]);
+                }
+
+                if (array_key_exists('purchase_id', $data) && (int) ($data['purchase_id'] ?? 0) !== (int) $expense->purchase_id) {
+                    throw ValidationException::withMessages([
+                        'purchase_id' => ['Purchase cannot be changed on a purchase expense.'],
+                    ]);
+                }
             }
 
             $expense->fill([
@@ -157,6 +213,12 @@ class ExpenseService
                 if ($category->isStaffSalary()) {
                     throw ValidationException::withMessages([
                         'expense_category_id' => ['Cannot change an expense to Staff Salary from here.'],
+                    ]);
+                }
+
+                if ($category->isPurchases()) {
+                    throw ValidationException::withMessages([
+                        'expense_category_id' => ['Cannot change an expense to Purchases from here.'],
                     ]);
                 }
 
@@ -182,7 +244,7 @@ class ExpenseService
 
         $expense->save();
 
-        return $expense->fresh(['category', 'staff', 'supplier']);
+        return $expense->fresh(['category', 'staff', 'supplier', 'purchase']);
     }
 
     public function deleteForUser(User $user, Expense $expense): void
@@ -223,6 +285,10 @@ class ExpenseService
 
         if (! empty($filters['supplier_id'])) {
             $query->where('supplier_id', $filters['supplier_id']);
+        }
+
+        if (! empty($filters['purchase_id'])) {
+            $query->where('purchase_id', $filters['purchase_id']);
         }
 
         if (! empty($filters['search'])) {

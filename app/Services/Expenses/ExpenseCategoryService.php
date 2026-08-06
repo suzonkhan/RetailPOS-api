@@ -32,13 +32,35 @@ class ExpenseCategoryService
         );
     }
 
+    public function ensurePurchasesCategory(Store $store): ExpenseCategory
+    {
+        return ExpenseCategory::query()->firstOrCreate(
+            [
+                'store_id' => $store->id,
+                'name' => ExpenseCategory::PURCHASES_NAME,
+            ],
+            [
+                'tenant_id' => $store->tenant_id,
+                'description' => 'Inventory purchases from vendors',
+                'is_active' => true,
+                'is_system' => true,
+            ]
+        );
+    }
+
+    public function ensureSystemCategories(Store $store): void
+    {
+        $this->ensureStaffSalaryCategory($store);
+        $this->ensurePurchasesCategory($store);
+    }
+
     /**
      * @return Collection<int, ExpenseCategory>
      */
     public function listForUser(User $user, array $filters = []): Collection
     {
         $store = $this->catalogScope->resolveStore($user);
-        $this->ensureStaffSalaryCategory($store);
+        $this->ensureSystemCategories($store);
 
         $query = ExpenseCategory::query()
             ->where('store_id', $store->id)
@@ -58,6 +80,12 @@ class ExpenseCategoryService
         if (strcasecmp($data['name'], ExpenseCategory::STAFF_SALARY_NAME) === 0) {
             throw ValidationException::withMessages([
                 'name' => ['Staff Salary is a system category and cannot be created manually.'],
+            ]);
+        }
+
+        if (strcasecmp($data['name'], ExpenseCategory::PURCHASES_NAME) === 0) {
+            throw ValidationException::withMessages([
+                'name' => ['Purchases is a system category and cannot be created manually.'],
             ]);
         }
 
@@ -93,6 +121,12 @@ class ExpenseCategoryService
         if (isset($data['name']) && strcasecmp($data['name'], ExpenseCategory::STAFF_SALARY_NAME) === 0 && ! $category->is_system) {
             throw ValidationException::withMessages([
                 'name' => ['Staff Salary is reserved for the system category.'],
+            ]);
+        }
+
+        if (isset($data['name']) && strcasecmp($data['name'], ExpenseCategory::PURCHASES_NAME) === 0 && ! $category->is_system) {
+            throw ValidationException::withMessages([
+                'name' => ['Purchases is reserved for the system category.'],
             ]);
         }
 

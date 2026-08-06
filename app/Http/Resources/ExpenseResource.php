@@ -34,6 +34,11 @@ class ExpenseResource extends JsonResource
                 'id' => $this->supplier->id,
                 'name' => $this->supplier->name,
             ] : null),
+            'purchase_id' => $this->purchase_id,
+            'purchase' => $this->whenLoaded('purchase', fn () => $this->purchase ? [
+                'id' => $this->purchase->id,
+                'purchase_number' => $this->purchase->purchase_number,
+            ] : null),
             'created_by' => $this->created_by,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature\Inventory;
 
-use App\Models\PaymentMethod;
+use App\Models\ExpenseCategory;
 use App\Models\Product;
 use App\Models\SaleItemLotAllocation;
 use App\Models\StockLot;
@@ -75,6 +75,22 @@ class InventoryFifoTest extends TestCase
         $this->getJson('/api/v1/purchases/'.$response->json('id'))
             ->assertOk()
             ->assertJsonCount(1, 'items');
+
+        $purchaseId = $response->json('id');
+
+        $this->assertDatabaseHas('expenses', [
+            'purchase_id' => $purchaseId,
+            'amount' => 9500,
+            'title' => 'PUR-0001',
+            'expense_category_id' => ExpenseCategory::query()
+                ->where('name', ExpenseCategory::PURCHASES_NAME)
+                ->value('id'),
+        ]);
+
+        $this->getJson('/api/v1/expenses?purchase_id='.$purchaseId)
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.total_amount', 9500);
     }
 
     public function test_sale_splits_across_fifo_lots_with_blended_unit_cost(): void

@@ -18,6 +18,7 @@ class Expense extends Model
         'expense_category_id',
         'staff_id',
         'supplier_id',
+        'purchase_id',
         'title',
         'amount',
         'expense_date',
@@ -65,6 +66,11 @@ class Expense extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    public function purchase(): BelongsTo
+    {
+        return $this->belongsTo(Purchase::class);
     }
 
     public function creator(): BelongsTo

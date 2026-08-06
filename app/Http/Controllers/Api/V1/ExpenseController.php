@@ -25,6 +25,7 @@ class ExpenseController extends Controller
             'expense_category_id',
             'staff_id',
             'supplier_id',
+            'purchase_id',
             'search',
             'per_page',
             'page',

@@ -37,13 +37,14 @@ class ExpensesTest extends TestCase
         $this->activateDefaultBranch($this->owner, 'startup-pro');
     }
 
-    public function test_listing_categories_seeds_staff_salary(): void
+    public function test_listing_categories_seeds_staff_salary_and_purchases(): void
     {
         Sanctum::actingAs($this->owner);
 
         $this->getJson('/api/v1/expense-categories')
             ->assertOk()
-            ->assertJsonFragment(['name' => 'Staff Salary', 'is_system' => true]);
+            ->assertJsonFragment(['name' => 'Staff Salary', 'is_system' => true])
+            ->assertJsonFragment(['name' => 'Purchases', 'is_system' => true]);
     }
 
     public function test_owner_can_crud_expense_categories_and_expenses(): void
@@ -132,6 +133,25 @@ class ExpensesTest extends TestCase
         $this->postJson('/api/v1/expenses', [
             'title' => 'Rahim salary',
             'amount' => 500,
+            'expense_category_id' => $systemId,
+            'expense_date' => '2026-07-15',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['expense_category_id']);
+    }
+
+    public function test_cannot_create_purchases_via_expenses_endpoint(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->getJson('/api/v1/expense-categories')->assertOk();
+
+        $systemId = ExpenseCategory::query()
+            ->where('name', ExpenseCategory::PURCHASES_NAME)
+            ->value('id');
+
+        $this->postJson('/api/v1/expenses', [
+            'title' => 'Stock purchase',
+            'amount' => 5000,
             'expense_category_id' => $systemId,
             'expense_date' => '2026-07-15',
         ])->assertStatus(422)

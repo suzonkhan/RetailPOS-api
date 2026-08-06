@@ -14,6 +14,8 @@ class ExpenseCategory extends Model
 
     public const STAFF_SALARY_NAME = 'Staff Salary';
 
+    public const PURCHASES_NAME = 'Purchases';
+
     protected $fillable = [
         'uuid',
         'tenant_id',
@@ -59,5 +61,10 @@ class ExpenseCategory extends Model
     public function isStaffSalary(): bool
     {
         return $this->is_system && $this->name === self::STAFF_SALARY_NAME;
+    }
+
+    public function isPurchases(): bool
+    {
+        return $this->is_system && $this->name === self::PURCHASES_NAME;
     }
 }
