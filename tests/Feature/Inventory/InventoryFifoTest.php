@@ -290,6 +290,69 @@ class InventoryFifoTest extends TestCase
             ->assertJsonPath('net_profit', -280);
     }
 
+    public function test_purchase_can_be_deleted_when_stock_unused(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $productId = $this->createProduct(['stock_quantity' => 0, 'cost_price' => 50]);
+
+        $purchaseId = $this->postJson('/api/v1/purchases', [
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 10, 'unit_cost' => 80],
+            ],
+        ])->assertCreated()->json('id');
+
+        $this->deleteJson("/api/v1/purchases/{$purchaseId}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Purchase deleted successfully.');
+
+        $this->assertSoftDeleted('purchases', ['id' => $purchaseId]);
+        $this->assertSoftDeleted('expenses', ['purchase_id' => $purchaseId]);
+        $this->assertDatabaseMissing('stock_lots', ['product_id' => $productId]);
+        $this->assertEquals(0.0, (float) Product::query()->findOrFail($productId)->stock_quantity);
+
+        $this->getJson("/api/v1/purchases/{$purchaseId}")->assertNotFound();
+    }
+
+    public function test_cannot_delete_purchase_after_stock_is_sold(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $productId = $this->createProduct([
+            'stock_quantity' => 0,
+            'selling_price' => 100,
+            'cost_price' => 50,
+        ]);
+
+        $purchaseId = $this->postJson('/api/v1/purchases', [
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 10, 'unit_cost' => 80],
+            ],
+        ])->assertCreated()->json('id');
+
+        $cashId = $this->cashPaymentMethodId();
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 2],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 200],
+            ],
+        ])->assertCreated();
+
+        $this->deleteJson("/api/v1/purchases/{$purchaseId}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['purchase']);
+
+        $this->assertDatabaseHas('purchases', [
+            'id' => $purchaseId,
+            'deleted_at' => null,
+        ]);
+        $this->assertEquals(8.0, (float) Product::query()->findOrFail($productId)->stock_quantity);
+    }
+
     public function test_staff_cannot_manage_purchases(): void
     {
         Sanctum::actingAs($this->owner);

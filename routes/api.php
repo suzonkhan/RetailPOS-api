@@ -132,6 +132,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/purchases', [PurchaseController::class, 'index']);
             Route::post('/purchases', [PurchaseController::class, 'store']);
             Route::get('/purchases/{purchase}', [PurchaseController::class, 'show']);
+            Route::delete('/purchases/{purchase}', [PurchaseController::class, 'destroy']);
             Route::get('/inventory/lots', [InventoryController::class, 'lots']);
             Route::post('/stock-adjustments', [InventoryController::class, 'adjust']);
         });

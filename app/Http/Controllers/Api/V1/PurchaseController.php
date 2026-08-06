@@ -51,4 +51,13 @@ class PurchaseController extends Controller
 
         return PurchaseResource::make($purchase);
     }
+
+    public function destroy(Purchase $purchase): JsonResponse
+    {
+        $this->purchases->deleteForUser(request()->user(), $purchase);
+
+        return response()->json([
+            'message' => 'Purchase deleted successfully.',
+        ]);
+    }
 }

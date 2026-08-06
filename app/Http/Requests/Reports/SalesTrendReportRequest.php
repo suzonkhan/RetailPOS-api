@@ -7,7 +7,7 @@ class SalesTrendReportRequest extends ReportDateRangeRequest
     public function rules(): array
     {
         return array_merge(parent::rules(), [
-            'period' => ['sometimes', 'string', 'in:day,week,month'],
+            'period' => ['sometimes', 'string', 'in:hour,day,week,month'],
         ]);
     }
 

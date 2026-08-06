@@ -2,9 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -89,29 +87,7 @@ return new class extends Migration
             $table->decimal('quantity', 12, 3);
             $table->decimal('unit_cost', 12, 2);
             $table->timestamps();
-
-            $table->index(['sale_item_id']);
-            $table->index(['stock_lot_id']);
         });
-
-        $products = DB::table('products')->where('stock_quantity', '>', 0)->get();
-
-        foreach ($products as $product) {
-            DB::table('stock_lots')->insert([
-                'uuid' => (string) Str::uuid(),
-                'tenant_id' => $product->tenant_id,
-                'store_id' => $product->store_id,
-                'product_id' => $product->id,
-                'purchase_item_id' => null,
-                'received_at' => $product->created_at ?? now(),
-                'expiration_date' => $product->expiration_date,
-                'unit_cost' => $product->cost_price ?? 0,
-                'quantity_received' => $product->stock_quantity,
-                'quantity_remaining' => $product->stock_quantity,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
     }
 
     public function down(): void

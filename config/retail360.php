@@ -6,6 +6,12 @@ return [
 
     'trial_plan_slug' => env('RETAIL360_TRIAL_PLAN', 'startup'),
 
+    /**
+     * Wall-clock timezone for reports and business dates.
+     * Defaults to APP_TIMEZONE (Asia/Dhaka). Keep in sync — do not use UTC here.
+     */
+    'timezone' => env('RETAIL360_TIMEZONE', env('APP_TIMEZONE', 'Asia/Dhaka')),
+
     'default_branch_name' => env('RETAIL360_DEFAULT_BRANCH_NAME', 'main branch'),
 
     'expired_branch_purge_days' => (int) env('RETAIL360_EXPIRED_BRANCH_PURGE_DAYS', 30),

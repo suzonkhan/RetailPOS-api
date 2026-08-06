@@ -108,11 +108,11 @@ class SaleService
         }
 
         if (! empty($filters['from'])) {
-            $query->whereDate('created_at', '>=', $filters['from']);
+            $query->where('created_at', '>=', \App\Support\AppTimezone::startOfDay($filters['from']));
         }
 
         if (! empty($filters['to'])) {
-            $query->whereDate('created_at', '<=', $filters['to']);
+            $query->where('created_at', '<=', \App\Support\AppTimezone::endOfDay($filters['to']));
         }
 
         $payment = $filters['payment'] ?? null;

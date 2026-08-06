@@ -33,6 +33,19 @@ class CustomerService
             });
         }
 
+        $due = $filters['due'] ?? null;
+        if ($due === 'due') {
+            $query->whereHas(
+                'openDues',
+                fn ($q) => $q->where('balance', '>', 0)
+            );
+        } elseif ($due === 'paid') {
+            $query->whereDoesntHave(
+                'openDues',
+                fn ($q) => $q->where('balance', '>', 0)
+            );
+        }
+
         $perPage = min(max((int) ($filters['per_page'] ?? 15), 1), 100);
 
         return $query->paginate($perPage);

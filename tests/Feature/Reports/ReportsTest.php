@@ -92,7 +92,41 @@ class ReportsTest extends TestCase
             ->assertJsonPath('net_revenue', 110)
             ->assertJsonPath('discounts_total', 0)
             ->assertJsonPath('average_order_value', 110)
-            ->assertJsonPath('outstanding_dues', 110);
+            ->assertJsonPath('outstanding_dues', 110)
+            ->assertJsonPath('changes.net_revenue', 100)
+            ->assertJsonPath('changes.sale_count', 100)
+            ->assertJsonPath('payment_methods_total', 220)
+            ->assertJsonCount(2, 'payment_methods')
+            ->assertJsonFragment([
+                'payment_method_id' => $cashId,
+                'sales_total' => 110,
+                'total' => 110,
+            ])
+            ->assertJsonFragment([
+                'payment_method_id' => $dueId,
+                'sales_total' => 110,
+                'total' => 110,
+            ])
+            ->assertJsonStructure([
+                'previous_from',
+                'previous_to',
+                'changes' => [
+                    'sale_count',
+                    'gross_revenue',
+                    'net_revenue',
+                    'returns_total',
+                ],
+                'payment_methods' => [
+                    [
+                        'payment_method_id',
+                        'payment_method_name',
+                        'sales_total',
+                        'due_collections_total',
+                        'total',
+                        'payment_count',
+                    ],
+                ],
+            ]);
     }
 
     public function test_sales_summary_respects_date_filters(): void
@@ -190,6 +224,17 @@ class ReportsTest extends TestCase
                 'net_revenue' => 160,
             ]);
 
+        $hourLabel = now()->format('H:00');
+        $hourly = $this->getJson("/api/v1/reports/sales-trend?from={$today}&to={$today}&period=hour")
+            ->assertOk()
+            ->assertJsonPath('period', 'hour');
+        $this->assertGreaterThanOrEqual(1, count($hourly->json('data')));
+        $this->assertTrue(
+            collect($hourly->json('data'))->contains(
+                fn (array $bucket) => $bucket['label'] === $hourLabel && $bucket['sale_count'] === 1
+            )
+        );
+
         $this->getJson("/api/v1/reports/top-products?from={$from}&to={$to}&sort_by=revenue&limit=5")
             ->assertOk()
             ->assertJsonPath('sort_by', 'revenue')
@@ -202,8 +247,19 @@ class ReportsTest extends TestCase
         $this->getJson("/api/v1/reports/payment-breakdown?from={$from}&to={$to}")
             ->assertOk()
             ->assertJsonCount(2, 'data')
-            ->assertJsonFragment(['total' => 120])
-            ->assertJsonFragment(['total' => 40]);
+            ->assertJsonPath('total_amount', 160)
+            ->assertJsonFragment([
+                'payment_method_id' => $cashId,
+                'sales_total' => 120,
+                'due_collections_total' => 0,
+                'total' => 120,
+            ])
+            ->assertJsonFragment([
+                'payment_method_id' => $bkashId,
+                'sales_total' => 40,
+                'due_collections_total' => 0,
+                'total' => 40,
+            ]);
     }
 
     public function test_profit_summary_includes_expenses_and_net_profit(): void

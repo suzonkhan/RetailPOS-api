@@ -17,7 +17,6 @@ return new class extends Migration
             $table->timestamp('last_sync_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['tenant_id', 'uuid']);
             $table->index(['tenant_id', 'updated_at']);
         });
 

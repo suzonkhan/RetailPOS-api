@@ -10,7 +10,7 @@ use App\Http\Requests\Reports\SlowMovingProductsReportRequest;
 use App\Http\Requests\Reports\TopProductsReportRequest;
 use App\Services\Reports\ReportScopeService;
 use App\Services\Reports\ReportService;
-use Carbon\Carbon;
+use App\Support\AppTimezone;
 use Illuminate\Http\JsonResponse;
 
 class ReportController extends Controller
@@ -99,9 +99,8 @@ class ReportController extends Controller
         $store = $this->scope->storeFor($request->user());
 
         if (isset($validated['date'])) {
-            $day = Carbon::parse($validated['date']);
-            $from = $day->copy()->startOfDay();
-            $to = $day->copy()->endOfDay();
+            $from = AppTimezone::startOfDay($validated['date']);
+            $to = AppTimezone::endOfDay($validated['date']);
         } else {
             $range = $this->scope->resolveDateRange($validated);
             $from = $range['from'];

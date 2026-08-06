@@ -41,11 +41,11 @@ class PurchaseService
         }
 
         if (! empty($filters['from'])) {
-            $query->whereDate('purchased_at', '>=', $filters['from']);
+            $query->where('purchased_at', '>=', \App\Support\AppTimezone::startOfDay($filters['from']));
         }
 
         if (! empty($filters['to'])) {
-            $query->whereDate('purchased_at', '<=', $filters['to']);
+            $query->where('purchased_at', '<=', \App\Support\AppTimezone::endOfDay($filters['to']));
         }
 
         if (! empty($filters['search'])) {
@@ -217,6 +217,93 @@ class PurchaseService
         }
 
         return $purchase->load(['supplier', 'creator', 'items.product']);
+    }
+
+    public function deleteForUser(User $user, Purchase $purchase): void
+    {
+        $store = $this->catalogScope->resolveStore($user);
+
+        if ((int) $purchase->store_id !== (int) $store->id) {
+            abort(404);
+        }
+
+        DB::transaction(function () use ($store, $purchase) {
+            $purchase = Purchase::query()
+                ->whereKey($purchase->id)
+                ->lockForUpdate()
+                ->with(['items.stockLot.allocations', 'items.product', 'expense'])
+                ->firstOrFail();
+
+            foreach ($purchase->items as $item) {
+                $lot = $item->stockLot;
+
+                if ($lot === null) {
+                    continue;
+                }
+
+                $received = (float) $lot->quantity_received;
+                $remaining = (float) $lot->quantity_remaining;
+
+                if (abs($received - $remaining) > 0.0001) {
+                    throw ValidationException::withMessages([
+                        'purchase' => [
+                            'Cannot delete this purchase because stock from it has already been sold or adjusted.',
+                        ],
+                    ]);
+                }
+
+                if ($lot->allocations->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'purchase' => [
+                            'Cannot delete this purchase because stock from it has already been sold or adjusted.',
+                        ],
+                    ]);
+                }
+            }
+
+            foreach ($purchase->items as $item) {
+                $lot = $item->stockLot;
+                $product = $item->product;
+
+                if ($product === null) {
+                    $lot?->delete();
+
+                    continue;
+                }
+
+                $product = Product::query()->lockForUpdate()->find($product->id);
+                $variant = null;
+
+                if ($item->product_variant_id !== null) {
+                    $variant = ProductVariant::query()
+                        ->lockForUpdate()
+                        ->find($item->product_variant_id);
+                }
+
+                $qty = (float) $item->quantity;
+
+                if ($lot !== null) {
+                    $lot->delete();
+                }
+
+                if ($product !== null && $qty > 0) {
+                    $this->stockMovement->adjust(
+                        $store,
+                        $product,
+                        -$qty,
+                        StockMovement::TYPE_PURCHASE,
+                        Purchase::class,
+                        $purchase->id,
+                        $variant,
+                    );
+
+                    $this->lots->refreshProductStockMeta($product, $variant);
+                }
+            }
+
+            $purchase->expense?->delete();
+            $purchase->delete();
+        });
     }
 
     private function nextPurchaseNumber(int $storeId): string

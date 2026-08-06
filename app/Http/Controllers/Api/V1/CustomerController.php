@@ -24,7 +24,7 @@ class CustomerController extends Controller
     {
         $paginator = $this->customerService->listForUser(
             request()->user(),
-            request()->only(['search', 'per_page', 'page'])
+            request()->only(['search', 'per_page', 'page', 'due'])
         );
 
         return CustomerResource::collection($paginator)->additional([

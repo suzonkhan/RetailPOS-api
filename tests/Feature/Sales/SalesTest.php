@@ -302,6 +302,15 @@ class SalesTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.open_due_balance', 30);
 
+        $this->getJson('/api/v1/customers?due=due')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $customerId);
+
+        $this->getJson('/api/v1/customers?due=paid')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+
         $this->getJson("/api/v1/customers/{$customerId}")
             ->assertOk()
             ->assertJsonPath('open_due_balance', 30);

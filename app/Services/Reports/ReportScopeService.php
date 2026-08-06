@@ -5,6 +5,7 @@ namespace App\Services\Reports;
 use App\Models\Store;
 use App\Models\User;
 use App\Services\Sales\SalesScopeService;
+use App\Support\AppTimezone;
 use Carbon\Carbon;
 
 class ReportScopeService
@@ -24,11 +25,11 @@ class ReportScopeService
     public function resolveDateRange(array $input): array
     {
         $to = isset($input['to'])
-            ? Carbon::parse($input['to'])->endOfDay()
-            : now()->endOfDay();
+            ? AppTimezone::endOfDay($input['to'])
+            : AppTimezone::now()->endOfDay();
 
         $from = isset($input['from'])
-            ? Carbon::parse($input['from'])->startOfDay()
+            ? AppTimezone::startOfDay($input['from'])
             : $to->copy()->startOfMonth()->startOfDay();
 
         if ($from->gt($to)) {

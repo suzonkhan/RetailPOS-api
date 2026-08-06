@@ -24,8 +24,6 @@ return new class extends Migration
             $table->timestamp('suspended_at')->nullable();
             $table->timestamp('data_purge_scheduled_at')->nullable();
             $table->timestamps();
-
-            $table->index('tenant_id');
         });
 
         Schema::create('store_user', function (Blueprint $table) {
@@ -36,7 +34,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['store_id', 'user_id']);
-            $table->index('user_id');
         });
 
         Schema::table('users', function (Blueprint $table) {
