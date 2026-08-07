@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Catalog;
 
 use App\Http\Requests\Catalog\Concerns\ValidatesCatalogRelations;
+use App\Services\Catalog\CatalogScopeService;
 use App\Support\Uom;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,11 +24,13 @@ class StoreProductRequest extends FormRequest
 
     public function rules(): array
     {
-        $tenantId = $this->user()->tenant_id;
+        $storeId = app(CatalogScopeService::class)
+            ->resolveStore($this->user())
+            ->id;
 
         return array_merge($this->catalogRelationRules(), $this->vatRules(), [
             'name' => ['required', 'string', 'max:255'],
-            'sku' => ['nullable', 'string', 'max:64', Rule::unique('products', 'sku')->where('tenant_id', $tenantId)],
+            'sku' => ['nullable', 'string', 'max:64', Rule::unique('products', 'sku')->where('store_id', $storeId)],
             'barcode' => ['nullable', 'string', 'max:64'],
             'description' => ['nullable', 'string', 'max:5000'],
             'selling_price' => ['sometimes', 'numeric', 'min:0'],

@@ -26,7 +26,6 @@ class UpdateProductRequest extends FormRequest
     {
         /** @var Product $product */
         $product = $this->route('product');
-        $tenantId = $this->user()->tenant_id;
 
         return array_merge($this->catalogRelationRules(categoryRequired: false), $this->vatRules(), [
             'name' => ['sometimes', 'string', 'max:255'],
@@ -35,7 +34,7 @@ class UpdateProductRequest extends FormRequest
                 'string',
                 'max:64',
                 Rule::unique('products', 'sku')
-                    ->where('tenant_id', $tenantId)
+                    ->where('store_id', $product->store_id)
                     ->ignore($product->id),
             ],
             'barcode' => ['nullable', 'string', 'max:64'],

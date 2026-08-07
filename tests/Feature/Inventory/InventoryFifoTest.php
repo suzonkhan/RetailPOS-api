@@ -388,6 +388,79 @@ class InventoryFifoTest extends TestCase
             ->assertJsonPath('data.0.is_expired', true);
     }
 
+    public function test_inventory_lots_support_catalog_filters(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryA = $this->createCategory();
+        $categoryB = $this->postJson('/api/v1/categories', [
+            'name' => 'Other '.Str::random(4),
+        ])->assertCreated()->json('id');
+        $supplier = $this->createSupplier();
+        $brand = $this->postJson('/api/v1/brands', [
+            'name' => 'Brand '.Str::random(4),
+        ])->assertCreated()->json('id');
+
+        $matchedId = $this->postJson('/api/v1/products', [
+            'category_id' => $categoryA,
+            'supplier_id' => $supplier,
+            'brand_id' => $brand,
+            'name' => 'Filtered Milk',
+            'sku' => 'FLT-MILK',
+            'barcode' => '8801666000001',
+            'selling_price' => 100,
+            'cost_price' => 50,
+            'uom' => 'pcs',
+            'manage_inventory' => true,
+        ])->assertCreated()->json('id');
+
+        $otherId = $this->postJson('/api/v1/products', [
+            'category_id' => $categoryB,
+            'name' => 'Other Juice',
+            'sku' => 'OTH-JUICE',
+            'barcode' => '8801666000002',
+            'selling_price' => 80,
+            'cost_price' => 40,
+            'uom' => 'pcs',
+            'manage_inventory' => true,
+        ])->assertCreated()->json('id');
+
+        foreach ([$matchedId, $otherId] as $productId) {
+            $this->postJson('/api/v1/purchases', [
+                'items' => [
+                    [
+                        'product_id' => $productId,
+                        'quantity' => 2,
+                        'unit_cost' => 10,
+                    ],
+                ],
+            ])->assertCreated();
+        }
+
+        $this->getJson("/api/v1/inventory/lots?has_remaining=1&category_id={$categoryA}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.product_id', $matchedId);
+
+        $this->getJson("/api/v1/inventory/lots?has_remaining=1&supplier_id={$supplier}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson("/api/v1/inventory/lots?has_remaining=1&brand_id={$brand}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data');
+
+        $this->getJson('/api/v1/inventory/lots?has_remaining=1&search=8801666000001')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.product.barcode', '8801666000001');
+
+        $this->getJson('/api/v1/inventory/lots?has_remaining=1&search=Filtered')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.product.name', 'Filtered Milk');
+    }
+
     private function createCategory(): int
     {
         return $this->postJson('/api/v1/categories', [

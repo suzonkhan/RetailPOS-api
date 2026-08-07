@@ -20,7 +20,17 @@ class StockLotResource extends JsonResource
                 'id' => $this->product->id,
                 'name' => $this->product->name,
                 'sku' => $this->product->sku,
+                'barcode' => $this->product->barcode,
                 'uom' => $this->product->uom ?? 'pcs',
+                'category' => $this->product->relationLoaded('category') && $this->product->category
+                    ? ['id' => $this->product->category->id, 'name' => $this->product->category->name]
+                    : null,
+                'supplier' => $this->product->relationLoaded('supplier') && $this->product->supplier
+                    ? ['id' => $this->product->supplier->id, 'name' => $this->product->supplier->name]
+                    : null,
+                'brand' => $this->product->relationLoaded('brand') && $this->product->brand
+                    ? ['id' => $this->product->brand->id, 'name' => $this->product->brand->name]
+                    : null,
             ]),
             'variant_label' => $this->when(
                 $this->relationLoaded('productVariant'),

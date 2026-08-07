@@ -22,7 +22,17 @@ class InventoryController extends Controller
     {
         $paginator = $this->inventory->listLotsForUser(
             request()->user(),
-            request()->only(['product_id', 'expired', 'has_remaining', 'per_page', 'page'])
+            request()->only([
+                'product_id',
+                'search',
+                'category_id',
+                'supplier_id',
+                'brand_id',
+                'expired',
+                'has_remaining',
+                'per_page',
+                'page',
+            ])
         );
 
         return StockLotResource::collection($paginator)->additional([
