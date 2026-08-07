@@ -152,6 +152,7 @@ class SyncPullService
                     ->where('store_id', $storeId)
                     ->where('updated_at', '>', $since)
                     ->withTrashed()
+                    ->with(['openDues' => fn ($q) => $q->where('balance', '>', 0)])
                     ->orderBy('name')
                     ->get();
             }

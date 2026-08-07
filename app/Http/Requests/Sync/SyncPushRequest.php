@@ -25,6 +25,8 @@ class SyncPushRequest extends FormRequest
             'entities.sales.*.items' => ['required', 'array', 'min:1'],
             'entities.sales.*.items.*.product_id' => ['sometimes', 'integer'],
             'entities.sales.*.items.*.product_uuid' => ['sometimes', 'uuid'],
+            'entities.sales.*.items.*.product_variant_id' => ['sometimes', 'nullable', 'integer'],
+            'entities.sales.*.items.*.product_variant_uuid' => ['sometimes', 'nullable', 'uuid'],
             'entities.sales.*.items.*.quantity' => ['required', 'numeric', 'gt:0'],
             'entities.sales.*.items.*.unit_price' => ['sometimes', 'numeric', 'min:0'],
             'entities.sales.*.payments' => ['required', 'array', 'min:1'],

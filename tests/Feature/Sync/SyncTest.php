@@ -467,6 +467,150 @@ class SyncTest extends TestCase
         ]);
     }
 
+    public function test_pull_customers_include_open_due_balance(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $this->postJson('/api/v1/devices', [
+            'device_id' => $this->deviceId,
+            'name' => 'Due Balance Device',
+        ])->assertCreated();
+
+        $customer = $this->postJson('/api/v1/customers', [
+            'name' => 'Due Customer',
+            'mobile' => '01712345680',
+        ])->assertCreated();
+
+        $credit = PaymentMethod::query()
+            ->where('tenant_id', $this->owner->tenant_id)
+            ->where('is_credit', true)
+            ->first();
+
+        if ($credit === null) {
+            $credit = PaymentMethod::query()->create([
+                'tenant_id' => $this->owner->tenant_id,
+                'store_id' => $this->owner->default_store_id,
+                'uuid' => (string) Str::uuid(),
+                'name' => 'Due',
+                'is_active' => true,
+                'is_credit' => true,
+                'requires_reference' => false,
+                'sort_order' => 99,
+            ]);
+        }
+
+        $categoryId = $this->createCategory();
+        $product = $this->postJson('/api/v1/products', [
+            'name' => 'Due Product',
+            'category_id' => $categoryId,
+            'selling_price' => 100,
+            'uom' => 'pcs',
+            'manage_inventory' => false,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'customer_id' => $customer->json('id'),
+            'items' => [
+                ['product_id' => $product->json('id'), 'quantity' => 1, 'unit_price' => 100],
+            ],
+            'payments' => [
+                ['payment_method_id' => $credit->id, 'amount' => 100],
+            ],
+        ])->assertCreated();
+
+        $response = $this->getJson('/api/v1/sync/pull?'.http_build_query([
+            'since' => '2020-01-01T00:00:00Z',
+            'device_id' => $this->deviceId,
+            'include' => 'customers',
+        ]))->assertOk();
+
+        $row = collect($response->json('customers'))
+            ->firstWhere('uuid', $customer->json('uuid'));
+
+        $this->assertNotNull($row);
+        $this->assertArrayHasKey('open_due_balance', $row);
+        $this->assertGreaterThan(0, (float) $row['open_due_balance']);
+    }
+
+    public function test_push_sale_accepts_product_variant_uuid(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $product = $this->postJson('/api/v1/products', [
+            'name' => 'Variant Sync Product',
+            'category_id' => $categoryId,
+            'selling_price' => 50,
+            'uom' => 'pcs',
+            'manage_inventory' => true,
+        ])->assertCreated();
+
+        $productId = $product->json('id');
+        $sizeAttr = $this->postJson('/api/v1/variation-attributes', [
+            'name' => 'Size Sync',
+            'values' => ['M'],
+        ])->assertCreated();
+        $valueId = $sizeAttr->json('values.0.id');
+
+        $setup = $this->putJson("/api/v1/products/{$productId}/variations/setup", [
+            'has_variants' => true,
+            'attribute_value_ids' => [$valueId],
+        ])->assertOk();
+
+        $variantId = $setup->json('variants.0.id');
+        $variantUuid = $setup->json('variants.0.uuid');
+        $this->assertNotNull($variantId);
+        $this->assertNotNull($variantUuid);
+
+        $this->putJson("/api/v1/products/{$productId}/variants/bulk", [
+            'variants' => [
+                [
+                    'id' => $variantId,
+                    'sku' => 'VAR-SYNC-M',
+                    'stock_quantity' => 5,
+                ],
+            ],
+        ])->assertOk();
+
+        $cash = PaymentMethod::query()
+            ->where('tenant_id', $this->owner->tenant_id)
+            ->where('is_credit', false)
+            ->firstOrFail();
+
+        $this->postJson('/api/v1/sync/push', [
+            'device_id' => $this->deviceId,
+            'entities' => [
+                'sales' => [
+                    [
+                        'client_uuid' => (string) Str::uuid(),
+                        'items' => [
+                            [
+                                'product_uuid' => $product->json('uuid'),
+                                'product_variant_uuid' => $variantUuid,
+                                'quantity' => 1,
+                                'unit_price' => 50,
+                            ],
+                        ],
+                        'payments' => [
+                            [
+                                'payment_method_uuid' => $cash->uuid,
+                                'amount' => 50,
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('results.sales.accepted', 1);
+
+        $this->assertDatabaseHas('sale_items', [
+            'product_id' => $productId,
+            'product_variant_id' => $variantId,
+            'quantity' => 1,
+        ]);
+    }
+
     private function createCategory(): int
     {
         return $this->createCategoryAs($this->owner);
