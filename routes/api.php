@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\PaymentMethodController;
 use App\Http\Controllers\Api\V1\PlanController;
+use App\Http\Controllers\Api\V1\ProductBarcodeLookupController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductCsvController;
 use App\Http\Controllers\Api\V1\ProductImageController;
@@ -117,6 +118,7 @@ Route::prefix('v1')->group(function () {
             Route::get('products/export', [ProductCsvController::class, 'export']);
             Route::get('products/import/template', [ProductCsvController::class, 'template']);
             Route::post('products/import', [ProductCsvController::class, 'import']);
+            Route::get('products/barcode-lookup', ProductBarcodeLookupController::class);
             Route::apiResource('products', ProductController::class);
             Route::get('products/{product}/variations', [ProductVariantController::class, 'show']);
             Route::put('products/{product}/variations/setup', [ProductVariantController::class, 'setup']);
