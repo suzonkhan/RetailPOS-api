@@ -33,14 +33,24 @@ class RbacTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_cashier_cannot_access_sales_report(): void
+    public function test_cashier_can_access_sales_report_for_today_yesterday_only(): void
     {
         $cashier = $this->createTenantUser('cashier', '8801712345691', '8801712345682');
 
         Sanctum::actingAs($cashier);
 
-        $this->getJson('/api/v1/reports/sales-summary')
-            ->assertForbidden();
+        $tz = config('retail360.timezone', config('app.timezone'));
+        $today = now($tz)->toDateString();
+        $yesterday = now($tz)->subDay()->toDateString();
+        $oldFrom = now($tz)->subDays(30)->toDateString();
+
+        $this->getJson("/api/v1/reports/sales-summary?from={$today}&to={$today}")
+            ->assertOk();
+
+        $this->getJson("/api/v1/reports/sales-summary?from={$oldFrom}&to={$today}")
+            ->assertOk()
+            ->assertJsonPath('from', $yesterday)
+            ->assertJsonPath('to', $today);
     }
 
     public function test_owner_can_access_sales_report(): void

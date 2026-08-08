@@ -8,7 +8,13 @@ class ReportDateRangeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('reports.view') ?? false;
+        $user = $this->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->can('reports.view') || $user->can('dashboard.view');
     }
 
     public function rules(): array

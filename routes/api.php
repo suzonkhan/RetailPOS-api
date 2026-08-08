@@ -167,7 +167,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/customers/{customer}/due-payments', [DuePaymentController::class, 'store']);
         });
 
-        Route::middleware('permission:reports.view')->group(function () {
+        Route::middleware('permission:reports.view|dashboard.view')->group(function () {
             Route::get('/reports/sales-summary', [ReportController::class, 'salesSummary']);
             Route::get('/reports/sales-trend', [ReportController::class, 'salesTrend']);
             Route::get('/reports/top-products', [ReportController::class, 'topProducts']);

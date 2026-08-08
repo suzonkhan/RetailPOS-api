@@ -10,7 +10,6 @@ use App\Http\Requests\Reports\SlowMovingProductsReportRequest;
 use App\Http\Requests\Reports\TopProductsReportRequest;
 use App\Services\Reports\ReportScopeService;
 use App\Services\Reports\ReportService;
-use App\Support\AppTimezone;
 use Illuminate\Http\JsonResponse;
 
 class ReportController extends Controller
@@ -22,8 +21,9 @@ class ReportController extends Controller
 
     public function salesSummary(ReportDateRangeRequest $request): JsonResponse
     {
-        $range = $this->scope->resolveDateRange($request->validated());
-        $store = $this->scope->storeFor($request->user());
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->salesSummary($store, $range['from'], $range['to'])
@@ -32,9 +32,10 @@ class ReportController extends Controller
 
     public function salesTrend(SalesTrendReportRequest $request): JsonResponse
     {
+        $user = $request->user();
         $validated = $request->validated();
-        $range = $this->scope->resolveDateRange($validated);
-        $store = $this->scope->storeFor($request->user());
+        $range = $this->scope->resolveDateRange($validated, $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->salesTrend(
@@ -48,9 +49,10 @@ class ReportController extends Controller
 
     public function topProducts(TopProductsReportRequest $request): JsonResponse
     {
+        $user = $request->user();
         $validated = $request->validated();
-        $range = $this->scope->resolveDateRange($validated);
-        $store = $this->scope->storeFor($request->user());
+        $range = $this->scope->resolveDateRange($validated, $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->topProducts(
@@ -65,8 +67,9 @@ class ReportController extends Controller
 
     public function paymentBreakdown(ReportDateRangeRequest $request): JsonResponse
     {
-        $range = $this->scope->resolveDateRange($request->validated());
-        $store = $this->scope->storeFor($request->user());
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->paymentBreakdown($store, $range['from'], $range['to'])
@@ -75,8 +78,9 @@ class ReportController extends Controller
 
     public function profitSummary(ReportDateRangeRequest $request): JsonResponse
     {
-        $range = $this->scope->resolveDateRange($request->validated());
-        $store = $this->scope->storeFor($request->user());
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->profitSummary($store, $range['from'], $range['to'])
@@ -85,8 +89,9 @@ class ReportController extends Controller
 
     public function businessSummary(ReportDateRangeRequest $request): JsonResponse
     {
-        $range = $this->scope->resolveDateRange($request->validated());
-        $store = $this->scope->storeFor($request->user());
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->businessSummary($store, $range['from'], $range['to'])
@@ -95,14 +100,14 @@ class ReportController extends Controller
 
     public function dailySales(DailySalesReportRequest $request): JsonResponse
     {
+        $user = $request->user();
         $validated = $request->validated();
-        $store = $this->scope->storeFor($request->user());
+        $store = $this->scope->storeFor($user);
 
         if (isset($validated['date'])) {
-            $from = AppTimezone::startOfDay($validated['date']);
-            $to = AppTimezone::endOfDay($validated['date']);
+            [$from, $to] = $this->scope->resolveDayBounds($user, $validated['date']);
         } else {
-            $range = $this->scope->resolveDateRange($validated);
+            $range = $this->scope->resolveDateRange($validated, $user);
             $from = $range['from'];
             $to = $range['to'];
         }
@@ -114,8 +119,9 @@ class ReportController extends Controller
 
     public function productSales(ReportDateRangeRequest $request): JsonResponse
     {
-        $range = $this->scope->resolveDateRange($request->validated());
-        $store = $this->scope->storeFor($request->user());
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->productSales($store, $range['from'], $range['to'])
@@ -133,8 +139,9 @@ class ReportController extends Controller
 
     public function stockLedger(ReportDateRangeRequest $request): JsonResponse
     {
-        $range = $this->scope->resolveDateRange($request->validated());
-        $store = $this->scope->storeFor($request->user());
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->stockLedger($store, $range['from'], $range['to'])
@@ -152,8 +159,9 @@ class ReportController extends Controller
 
     public function expenses(ReportDateRangeRequest $request): JsonResponse
     {
-        $range = $this->scope->resolveDateRange($request->validated());
-        $store = $this->scope->storeFor($request->user());
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->expensesReport($store, $range['from'], $range['to'])
@@ -171,9 +179,10 @@ class ReportController extends Controller
 
     public function slowMovingProducts(SlowMovingProductsReportRequest $request): JsonResponse
     {
+        $user = $request->user();
         $validated = $request->validated();
-        $range = $this->scope->resolveDateRange($validated);
-        $store = $this->scope->storeFor($request->user());
+        $range = $this->scope->resolveDateRange($validated, $user);
+        $store = $this->scope->storeFor($user);
 
         return response()->json(
             $this->reports->slowMovingProducts(

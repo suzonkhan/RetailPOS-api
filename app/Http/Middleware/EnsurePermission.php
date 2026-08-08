@@ -8,7 +8,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsurePermission
 {
-    public function handle(Request $request, Closure $next, string $permission): Response
+    /**
+     * @param  string  ...$permissions  Permission names; pipe `|` means OR within a segment.
+     */
+    public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
         $user = $request->user();
 
@@ -16,10 +19,22 @@ class EnsurePermission
             abort(Response::HTTP_UNAUTHORIZED);
         }
 
-        if (! $user->can($permission)) {
-            abort(Response::HTTP_FORBIDDEN, 'You do not have permission to perform this action.');
+        $allowed = [];
+        foreach ($permissions as $permission) {
+            foreach (explode('|', $permission) as $name) {
+                $name = trim($name);
+                if ($name !== '') {
+                    $allowed[] = $name;
+                }
+            }
         }
 
-        return $next($request);
+        foreach ($allowed as $name) {
+            if ($user->can($name)) {
+                return $next($request);
+            }
+        }
+
+        abort(Response::HTTP_FORBIDDEN, 'You do not have permission to perform this action.');
     }
 }

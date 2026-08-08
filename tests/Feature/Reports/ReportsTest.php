@@ -396,15 +396,51 @@ class ReportsTest extends TestCase
         $this->getJson('/api/v1/reports/current-stock')->assertForbidden();
     }
 
-    public function test_cashier_cannot_access_reports(): void
+    public function test_cashier_can_access_reports_for_today(): void
     {
         $cashier = $this->createTenantUser('cashier');
-
         Sanctum::actingAs($cashier);
 
-        $this->getJson('/api/v1/reports/sales-summary')->assertForbidden();
-        $this->getJson('/api/v1/reports/business-summary')->assertForbidden();
-        $this->getJson('/api/v1/reports/profit-summary')->assertForbidden();
+        $today = now(config('retail360.timezone', config('app.timezone')))->toDateString();
+
+        $this->getJson("/api/v1/reports/sales-summary?from={$today}&to={$today}")
+            ->assertOk()
+            ->assertJsonPath('from', $today)
+            ->assertJsonPath('to', $today)
+            ->assertJsonPath('currency', 'BDT');
+
+        $this->getJson('/api/v1/reports/profit-summary')->assertOk();
+        $this->getJson('/api/v1/reports/business-summary')->assertOk();
+    }
+
+    public function test_cashier_report_date_range_is_clamped_to_yesterday_and_today(): void
+    {
+        $cashier = $this->createTenantUser('cashier');
+        Sanctum::actingAs($cashier);
+
+        $tz = config('retail360.timezone', config('app.timezone'));
+        $today = now($tz)->toDateString();
+        $yesterday = now($tz)->subDay()->toDateString();
+        $oldFrom = now($tz)->subDays(30)->toDateString();
+
+        $this->getJson("/api/v1/reports/sales-summary?from={$oldFrom}&to={$today}")
+            ->assertOk()
+            ->assertJsonPath('from', $yesterday)
+            ->assertJsonPath('to', $today);
+    }
+
+    public function test_owner_report_date_range_is_not_clamped(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $tz = config('retail360.timezone', config('app.timezone'));
+        $today = now($tz)->toDateString();
+        $from = now($tz)->subDays(30)->toDateString();
+
+        $this->getJson("/api/v1/reports/sales-summary?from={$from}&to={$today}")
+            ->assertOk()
+            ->assertJsonPath('from', $from)
+            ->assertJsonPath('to', $today);
     }
 
     public function test_phase_a_print_reports(): void
