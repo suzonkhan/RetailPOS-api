@@ -42,6 +42,7 @@ class EnsureActiveSubscription
         }
 
         return response()->json([
+            'message' => 'Subscription payment required.',
             'trial_ended' => true,
             'branch_id' => $store->id,
             'subscribe_url' => '/app/settings?tab=subscription',
