@@ -135,6 +135,32 @@ class ProductVariationTest extends TestCase
 
         $variant = ProductVariant::query()->findOrFail($variantId);
         $this->assertEquals(4.0, (float) $variant->fresh()->stock_quantity);
+
+        $saleId = $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'product_variant_id' => $variantId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $paymentMethodId, 'amount' => 800],
+            ],
+        ])->assertCreated()->json('id');
+
+        $saleItemId = \App\Models\SaleItem::query()->where('sale_id', $saleId)->value('id');
+
+        $this->postJson("/api/v1/sales/{$saleId}/returns", [
+            'items' => [
+                ['sale_item_id' => $saleItemId, 'quantity' => 1],
+            ],
+        ])->assertCreated();
+
+        $this->assertEquals(4.0, (float) $variant->fresh()->stock_quantity);
+        $this->assertDatabaseHas('stock_movements', [
+            'product_id' => $productId,
+            'product_variant_id' => $variantId,
+            'type' => 'return',
+            'quantity_delta' => 1,
+        ]);
     }
 
     /**

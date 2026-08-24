@@ -402,6 +402,168 @@ class SyncTest extends TestCase
         $this->assertArrayNotHasKey('image_url', $row);
     }
 
+    public function test_push_due_payment_is_idempotent_on_replay(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $product = $this->postJson('/api/v1/products', [
+            'name' => 'Due Product',
+            'category_id' => $categoryId,
+            'selling_price' => 100,
+            'uom' => 'pcs',
+            'manage_inventory' => true,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/stock-adjustments', [
+            'product_id' => $product->json('id'),
+            'quantity_delta' => 5,
+            'unit_cost' => 0,
+            'reason' => 'Seed',
+        ])->assertCreated();
+
+        $cash = $this->postJson('/api/v1/payment-methods', ['name' => 'Cash Collect'])->assertCreated();
+        $due = $this->postJson('/api/v1/payment-methods', [
+            'name' => 'Due Collect',
+            'is_credit' => true,
+        ])->assertCreated();
+
+        $customer = $this->postJson('/api/v1/customers', [
+            'name' => 'Due Customer',
+            'mobile' => '01712345999',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'customer_id' => $customer->json('id'),
+            'items' => [
+                ['product_id' => $product->json('id'), 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $due->json('id'), 'amount' => 100],
+            ],
+        ])->assertCreated();
+
+        $paymentUuid = (string) Str::uuid();
+        $payload = [
+            'device_id' => $this->deviceId,
+            'entities' => [
+                'due_payments' => [
+                    [
+                        'uuid' => $paymentUuid,
+                        'customer_uuid' => $customer->json('uuid'),
+                        'amount' => 40,
+                        'payment_method_uuid' => $cash->json('uuid'),
+                    ],
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/v1/sync/push', $payload)
+            ->assertOk()
+            ->assertJsonPath('results.due_payments.accepted', 1);
+
+        $this->assertDatabaseHas('customer_dues', [
+            'customer_id' => $customer->json('id'),
+            'balance' => 60,
+        ]);
+        $this->assertEquals(1, \App\Models\DuePayment::query()->where('uuid', $paymentUuid)->count());
+
+        $this->postJson('/api/v1/sync/push', $payload)
+            ->assertOk()
+            ->assertJsonPath('results.due_payments.accepted', 0)
+            ->assertJsonPath('results.due_payments.ignored', 1);
+
+        $this->assertDatabaseHas('customer_dues', [
+            'customer_id' => $customer->json('id'),
+            'balance' => 60,
+        ]);
+        $this->assertEquals(1, \App\Models\DuePayment::query()->where('uuid', $paymentUuid)->count());
+    }
+
+    public function test_push_sale_return_is_idempotent_on_replay(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $product = $this->postJson('/api/v1/products', [
+            'name' => 'Return Product',
+            'category_id' => $categoryId,
+            'selling_price' => 25,
+            'uom' => 'pcs',
+            'manage_inventory' => true,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/stock-adjustments', [
+            'product_id' => $product->json('id'),
+            'quantity_delta' => 10,
+            'unit_cost' => 0,
+            'reason' => 'Seed',
+        ])->assertCreated();
+
+        $cash = PaymentMethod::query()
+            ->where('tenant_id', $this->owner->tenant_id)
+            ->where('name', 'Cash')
+            ->first();
+
+        if ($cash === null) {
+            $cash = $this->postJson('/api/v1/payment-methods', ['name' => 'Cash Return'])->assertCreated();
+            $cashId = $cash->json('id');
+        } else {
+            $cashId = $cash->id;
+        }
+
+        $clientUuid = (string) Str::uuid();
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => $clientUuid,
+            'items' => [
+                ['product_id' => $product->json('id'), 'quantity' => 2],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 50],
+            ],
+        ])->assertCreated();
+
+        $this->assertEquals(8.0, (float) Product::query()->where('uuid', $product->json('uuid'))->first()->stock_quantity);
+
+        $returnUuid = (string) Str::uuid();
+        $payload = [
+            'device_id' => $this->deviceId,
+            'entities' => [
+                'sale_returns' => [
+                    [
+                        'uuid' => $returnUuid,
+                        'sale_client_uuid' => $clientUuid,
+                        'items' => [
+                            ['product_uuid' => $product->json('uuid'), 'quantity' => 1],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->postJson('/api/v1/sync/push', $payload)
+            ->assertOk()
+            ->assertJsonPath('results.sale_returns.accepted', 1);
+
+        $this->assertEquals(9.0, (float) Product::query()->where('uuid', $product->json('uuid'))->first()->stock_quantity);
+        $this->assertEquals(1, \App\Models\SaleReturn::query()->where('uuid', $returnUuid)->count());
+
+        $this->postJson('/api/v1/sync/push', $payload)
+            ->assertOk()
+            ->assertJsonPath('results.sale_returns.accepted', 0)
+            ->assertJsonPath('results.sale_returns.ignored', 1);
+
+        $this->assertEquals(9.0, (float) Product::query()->where('uuid', $product->json('uuid'))->first()->stock_quantity);
+        $this->assertEquals(1, \App\Models\SaleReturn::query()->where('uuid', $returnUuid)->count());
+        $this->assertEquals(1, StockMovement::query()->where('type', 'return')->count());
+    }
+
     public function test_pull_is_branch_scoped_for_catalog(): void
     {
         Sanctum::actingAs($this->owner);

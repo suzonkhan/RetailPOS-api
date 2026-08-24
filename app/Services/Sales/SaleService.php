@@ -286,7 +286,7 @@ class SaleService
                 ]);
             }
 
-            if ($method->requires_reference && empty($paymentData['reference'])) {
+            if ($method->requires_reference && empty($paymentData['reference']) && (float) $paymentData['amount'] > 0) {
                 throw ValidationException::withMessages([
                     'payments' => ["Reference is required for payment method: {$method->name}."],
                 ]);
@@ -360,7 +360,7 @@ class SaleService
                 'reference' => $paymentData['reference'] ?? null,
             ]);
 
-            if ($method->is_credit) {
+            if ($method->is_credit && (float) $paymentData['amount'] > 0) {
                 CustomerDue::query()->create([
                     'tenant_id' => $user->tenant_id,
                     'store_id' => $store->id,

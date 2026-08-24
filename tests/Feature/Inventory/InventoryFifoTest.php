@@ -340,6 +340,49 @@ class InventoryFifoTest extends TestCase
             ->assertJsonPath('net_profit', -280);
     }
 
+    public function test_profit_summary_subtracts_returned_cogs(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $productId = $this->createProduct([
+            'stock_quantity' => 0,
+            'selling_price' => 100,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+
+        $this->postJson('/api/v1/purchases', [
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 10, 'unit_cost' => 40],
+            ],
+        ])->assertCreated();
+
+        $cashId = $this->cashPaymentMethodId();
+
+        $sale = $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 2],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 200],
+            ],
+        ])->assertCreated();
+
+        $this->postJson("/api/v1/sales/{$sale->json('id')}/returns", [
+            'items' => [
+                ['sale_item_id' => $sale->json('items.0.id'), 'quantity' => 1],
+            ],
+        ])->assertCreated();
+
+        $this->getJson('/api/v1/reports/profit-summary?from='.now()->toDateString().'&to='.now()->toDateString())
+            ->assertOk()
+            ->assertJsonPath('cogs', 40)
+            ->assertJsonPath('gross_revenue', 200)
+            ->assertJsonPath('returns_total', 100)
+            ->assertJsonPath('gross_profit', 60);
+    }
+
     public function test_purchase_can_be_deleted_when_stock_unused(): void
     {
         Sanctum::actingAs($this->owner);

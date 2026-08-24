@@ -144,6 +144,9 @@ class LotService
         if ($allocations->isEmpty()) {
             $product = Product::query()->lockForUpdate()->findOrFail($saleItem->product_id);
             $store = $product->store;
+            $variant = $saleItem->product_variant_id
+                ? ProductVariant::query()->find($saleItem->product_variant_id)
+                : null;
 
             $this->createLot(
                 $store,
@@ -152,6 +155,8 @@ class LotService
                 (float) ($saleItem->unit_cost ?? $product->cost_price ?? 0),
                 now(),
                 $product->expiration_date?->format('Y-m-d'),
+                null,
+                $variant,
             );
 
             return;

@@ -12,6 +12,7 @@ use App\Models\Sale;
 use App\Models\SaleItem;
 use App\Models\SalePayment;
 use App\Models\SaleReturn;
+use App\Models\SaleReturnItem;
 use App\Models\StockAdjustment;
 use App\Models\StockMovement;
 use App\Models\Store;
@@ -805,7 +806,7 @@ class ReportService
         $grossRevenue = (float) (clone $sales)->sum('total');
         $returnsTotal = $this->returnsTotalInRange($store, $from, $to);
 
-        $cogs = (float) SaleItem::query()
+        $cogsSold = (float) SaleItem::query()
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.store_id', $store->id)
             ->whereIn('sales.status', [
@@ -815,8 +816,19 @@ class ReportService
             ])
             ->whereNull('sales.deleted_at')
             ->whereBetween('sales.created_at', [$from, $to])
-            ->selectRaw('COALESCE(SUM(quantity * COALESCE(unit_cost, 0)), 0) as cogs')
+            ->selectRaw('COALESCE(SUM(sale_items.quantity * COALESCE(sale_items.unit_cost, 0)), 0) as cogs')
             ->value('cogs');
+
+        $cogsReturned = (float) SaleReturnItem::query()
+            ->join('sale_returns', 'sale_returns.id', '=', 'sale_return_items.sale_return_id')
+            ->join('sale_items', 'sale_items.id', '=', 'sale_return_items.sale_item_id')
+            ->where('sale_returns.store_id', $store->id)
+            ->whereNull('sale_returns.deleted_at')
+            ->whereBetween('sale_returns.created_at', [$from, $to])
+            ->selectRaw('COALESCE(SUM(sale_return_items.quantity * COALESCE(sale_items.unit_cost, 0)), 0) as cogs')
+            ->value('cogs');
+
+        $cogs = round($cogsSold - $cogsReturned, 2);
 
         $expensesTotal = (float) Expense::query()
             ->where('store_id', $store->id)

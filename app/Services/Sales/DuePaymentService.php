@@ -7,6 +7,7 @@ use App\Models\CustomerDue;
 use App\Models\DuePayment;
 use App\Models\PaymentMethod;
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -23,9 +24,22 @@ class DuePaymentService
     {
         $this->scope->authorizeCustomer($user, $customer);
 
-        return DB::transaction(function () use ($user, $customer, $data) {
-            $store = $this->scope->resolveStore($user);
-            $amount = round((float) $data['amount'], 2);
+        try {
+            return DB::transaction(function () use ($user, $customer, $data) {
+                if (! empty($data['uuid'])) {
+                    $existing = DuePayment::query()
+                        ->where('tenant_id', $user->tenant_id)
+                        ->where('uuid', $data['uuid'])
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($existing !== null) {
+                        return $existing->load(['customerDue', 'paymentMethod']);
+                    }
+                }
+
+                $store = $this->scope->resolveStore($user);
+                $amount = round((float) $data['amount'], 2);
 
             if ($amount <= 0) {
                 throw ValidationException::withMessages([
@@ -56,6 +70,7 @@ class DuePaymentService
 
             $remaining = $amount;
             $firstDuePayment = null;
+            $clientUuid = $data['uuid'] ?? null;
 
             if (! empty($data['customer_due_id'])) {
                 $due = CustomerDue::query()
@@ -70,7 +85,15 @@ class DuePaymentService
                     ]);
                 }
 
-                $firstDuePayment = $this->applyToDue($user, $customer, $due, $remaining, $paymentMethodId, $data['reference'] ?? null);
+                $firstDuePayment = $this->applyToDue(
+                    $user,
+                    $customer,
+                    $due,
+                    $remaining,
+                    $paymentMethodId,
+                    $data['reference'] ?? null,
+                    $clientUuid,
+                );
                 $remaining = 0;
             } else {
                 $openDues = CustomerDue::query()
@@ -95,7 +118,16 @@ class DuePaymentService
                     }
 
                     $applyAmount = min($remaining, (float) $due->balance);
-                    $payment = $this->applyToDue($user, $customer, $due, $applyAmount, $paymentMethodId, $data['reference'] ?? null);
+                    $payment = $this->applyToDue(
+                        $user,
+                        $customer,
+                        $due,
+                        $applyAmount,
+                        $paymentMethodId,
+                        $data['reference'] ?? null,
+                        $clientUuid,
+                    );
+                    $clientUuid = null;
                     $firstDuePayment ??= $payment;
                     $remaining -= $applyAmount;
                 }
@@ -108,7 +140,21 @@ class DuePaymentService
             }
 
             return $firstDuePayment->load(['customerDue', 'paymentMethod']);
-        });
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            if (! empty($data['uuid'])) {
+                $existing = DuePayment::query()
+                    ->where('tenant_id', $user->tenant_id)
+                    ->where('uuid', $data['uuid'])
+                    ->first();
+
+                if ($existing !== null) {
+                    return $existing->load(['customerDue', 'paymentMethod']);
+                }
+            }
+
+            throw $e;
+        }
     }
 
     private function applyToDue(
@@ -118,10 +164,12 @@ class DuePaymentService
         float $amount,
         ?int $paymentMethodId,
         ?string $reference,
+        ?string $uuid = null,
     ): DuePayment {
         $applyAmount = round(min($amount, (float) $due->balance), 2);
 
         $duePayment = DuePayment::query()->create([
+            'uuid' => $uuid,
             'tenant_id' => $user->tenant_id,
             'store_id' => $customer->store_id,
             'customer_id' => $customer->id,

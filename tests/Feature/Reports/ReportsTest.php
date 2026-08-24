@@ -92,7 +92,7 @@ class ReportsTest extends TestCase
             ->assertJsonPath('net_revenue', 110)
             ->assertJsonPath('discounts_total', 0)
             ->assertJsonPath('average_order_value', 110)
-            ->assertJsonPath('outstanding_dues', 110)
+            ->assertJsonPath('outstanding_dues', 0)
             ->assertJsonPath('changes.net_revenue', 100)
             ->assertJsonPath('changes.sale_count', 100)
             ->assertJsonPath('payment_methods_total', 220)

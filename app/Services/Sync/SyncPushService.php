@@ -222,6 +222,7 @@ class SyncPushService
             $customer = Customer::query()->whereKey($customerId)->firstOrFail();
 
             $payload = [
+                'uuid' => $uuid,
                 'amount' => $dueData['amount'],
                 'reference' => $dueData['reference'] ?? null,
                 'customer_due_id' => $dueData['customer_due_id'] ?? null,
@@ -232,10 +233,12 @@ class SyncPushService
             }
 
             $payment = $this->duePayments->recordForCustomer($user, $customer, $payload);
-            $payment->uuid = $uuid;
-            $payment->save();
 
-            $this->accept($batch, $result, 'due_payments', $uuid, SyncLog::STATUS_ACCEPTED, 'Created.');
+            if ($payment->wasRecentlyCreated) {
+                $this->accept($batch, $result, 'due_payments', $uuid, SyncLog::STATUS_ACCEPTED, 'Created.');
+            } else {
+                $this->ignore($batch, $result, 'due_payments', $uuid, 'Duplicate uuid (idempotent).');
+            }
         } catch (ValidationException $e) {
             $message = collect($e->errors())->flatten()->first() ?? 'Validation failed.';
             $this->rejectEntity($batch, $result, $index, 'due_payments', $uuid, 'uuid', $message);
@@ -290,13 +293,16 @@ class SyncPushService
             }
 
             $saleReturn = $this->saleReturns->createForSale($user, $sale, [
+                'uuid' => $uuid,
                 'notes' => $returnData['notes'] ?? null,
                 'items' => $items,
             ]);
-            $saleReturn->uuid = $uuid;
-            $saleReturn->save();
 
-            $this->accept($batch, $result, 'sale_returns', $uuid, SyncLog::STATUS_ACCEPTED, 'Created.');
+            if ($saleReturn->wasRecentlyCreated) {
+                $this->accept($batch, $result, 'sale_returns', $uuid, SyncLog::STATUS_ACCEPTED, 'Created.');
+            } else {
+                $this->ignore($batch, $result, 'sale_returns', $uuid, 'Duplicate uuid (idempotent).');
+            }
         } catch (ValidationException $e) {
             $message = collect($e->errors())->flatten()->first() ?? 'Validation failed.';
             $this->rejectEntity($batch, $result, $index, 'sale_returns', $uuid, 'uuid', $message);
