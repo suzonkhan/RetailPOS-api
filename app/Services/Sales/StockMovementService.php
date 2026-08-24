@@ -6,9 +6,14 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
 use App\Models\Store;
+use App\Services\Inventory\LotService;
 
 class StockMovementService
 {
+    public function __construct(
+        private readonly LotService $lots,
+    ) {}
+
     public function adjust(
         Store $store,
         Product $product,
@@ -18,54 +23,20 @@ class StockMovementService
         int $referenceId,
         ?ProductVariant $variant = null,
     ): StockMovement {
-        $product->refresh();
-
-        if ($variant !== null) {
-            $variant->refresh();
-            $newQuantity = (float) $variant->stock_quantity + $quantityDelta;
-
-            if ($newQuantity < 0) {
-                abort(422, 'Insufficient stock for variant: '.$product->name);
-            }
-
-            $variant->stock_quantity = $newQuantity;
-            $variant->save();
-
-            $product->stock_quantity = round(
-                (float) $product->variants()->where('is_active', true)->sum('stock_quantity'),
-                3
-            );
-            $product->save();
-
-            return StockMovement::query()->create([
-                'tenant_id' => $store->tenant_id,
-                'store_id' => $store->id,
-                'product_id' => $product->id,
-                'product_variant_id' => $variant->id,
-                'type' => $type,
-                'quantity_delta' => $quantityDelta,
-                'quantity_after' => $newQuantity,
-                'reference_type' => $referenceType,
-                'reference_id' => $referenceId,
-            ]);
-        }
-
-        $newQuantity = (float) $product->stock_quantity + $quantityDelta;
-
-        if ($newQuantity < 0) {
-            abort(422, 'Insufficient stock for product: '.$product->name);
-        }
-
-        $product->stock_quantity = $newQuantity;
-        $product->save();
+        $quantityAfter = $variant !== null
+            ? $this->lots->sumSellableRemaining((int) $product->id, (int) $variant->id)
+            : ($product->has_variants
+                ? $this->lots->sumSellableRemaining((int) $product->id)
+                : $this->lots->sumSellableRemaining((int) $product->id, simpleLotsOnly: true));
 
         return StockMovement::query()->create([
             'tenant_id' => $store->tenant_id,
             'store_id' => $store->id,
             'product_id' => $product->id,
+            'product_variant_id' => $variant?->id,
             'type' => $type,
             'quantity_delta' => $quantityDelta,
-            'quantity_after' => $newQuantity,
+            'quantity_after' => $quantityAfter,
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
         ]);

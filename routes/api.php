@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\PaymentMethodController;
 use App\Http\Controllers\Api\V1\PlanController;
+use App\Http\Controllers\Api\V1\PosProductController;
 use App\Http\Controllers\Api\V1\ProductBarcodeLookupController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductCsvController;
@@ -159,6 +160,7 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::middleware('permission:pos.use')->group(function () {
+            Route::get('/pos/products', [PosProductController::class, 'index']);
             Route::post('/devices', [DeviceController::class, 'store']);
             Route::get('/sync/pull', [SyncController::class, 'pull']);
             Route::post('/sync/push', [SyncController::class, 'push']);
@@ -184,6 +186,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/reports/expenses', [ReportController::class, 'expenses']);
             Route::get('/reports/customer-dues', [ReportController::class, 'customerDues']);
             Route::get('/reports/slow-moving-products', [ReportController::class, 'slowMovingProducts']);
+            Route::get('/reports/sale-returns', [ReportController::class, 'saleReturns']);
         });
     });
 

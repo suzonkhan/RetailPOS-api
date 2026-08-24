@@ -113,6 +113,41 @@ class ReportService
         ];
     }
 
+    public function saleReturnsReport(Store $store, Carbon $from, Carbon $to): array
+    {
+        $returns = SaleReturn::query()
+            ->with(['sale:id,order_number', 'user:id,name', 'items'])
+            ->where('store_id', $store->id)
+            ->whereBetween('created_at', [$from, $to])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $data = $returns->map(function (SaleReturn $return): array {
+            return [
+                'return_id' => $return->id,
+                'uuid' => $return->uuid,
+                'sale_id' => $return->sale_id,
+                'order_number' => $return->sale?->order_number,
+                'datetime' => $return->created_at?->toIso8601String(),
+                'cashier' => $return->user?->name,
+                'items_returned' => (int) $return->items->sum('quantity'),
+                'subtotal' => round((float) $return->subtotal, 2),
+                'vat_total' => round((float) $return->vat_total, 2),
+                'total' => round((float) $return->total, 2),
+                'notes' => $return->notes,
+            ];
+        })->all();
+
+        return [
+            'currency' => self::CURRENCY,
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'return_count' => count($data),
+            'returns_total' => round(collect($data)->sum('total'), 2),
+            'data' => $data,
+        ];
+    }
+
     public function topProducts(Store $store, Carbon $from, Carbon $to, int $limit, string $sortBy): array
     {
         $orderColumn = $sortBy === 'quantity' ? 'quantity' : 'revenue';

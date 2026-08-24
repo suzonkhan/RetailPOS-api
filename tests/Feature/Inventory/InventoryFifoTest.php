@@ -168,6 +168,12 @@ class InventoryFifoTest extends TestCase
             ],
         ])->assertCreated();
 
+        $this->assertEquals(0.0, (float) Product::query()->findOrFail($productId)->stock_quantity);
+        $this->assertEquals(
+            5.0,
+            (float) StockLot::query()->where('product_id', $productId)->sum('quantity_remaining')
+        );
+
         $cashId = $this->cashPaymentMethodId();
 
         $this->postJson('/api/v1/sales', [
@@ -179,6 +185,50 @@ class InventoryFifoTest extends TestCase
                 ['payment_method_id' => $cashId, 'amount' => 100],
             ],
         ])->assertStatus(422);
+    }
+
+    public function test_product_stock_quantity_counts_only_sellable_lots(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $productId = $this->createProduct(['stock_quantity' => 0, 'selling_price' => 100]);
+
+        $this->postJson('/api/v1/purchases', [
+            'items' => [
+                [
+                    'product_id' => $productId,
+                    'quantity' => 5,
+                    'unit_cost' => 40,
+                    'expiration_date' => now()->subDay()->toDateString(),
+                ],
+                [
+                    'product_id' => $productId,
+                    'quantity' => 3,
+                    'unit_cost' => 40,
+                    'expiration_date' => now()->addMonth()->toDateString(),
+                ],
+            ],
+        ])->assertCreated();
+
+        $this->assertEquals(3.0, (float) Product::query()->findOrFail($productId)->stock_quantity);
+        $this->assertEquals(
+            8.0,
+            (float) StockLot::query()->where('product_id', $productId)->sum('quantity_remaining')
+        );
+
+        $cashId = $this->cashPaymentMethodId();
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 3],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 300],
+            ],
+        ])->assertCreated();
+
+        $this->assertEquals(0.0, (float) Product::query()->findOrFail($productId)->stock_quantity);
     }
 
     public function test_return_restores_lot_quantities(): void

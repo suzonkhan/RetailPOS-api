@@ -10,6 +10,7 @@ use App\Models\SaleItemLotAllocation;
 use App\Models\StockLot;
 use App\Models\Store;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -213,6 +214,63 @@ class LotService
         return $restorable;
     }
 
+    public function constrainSellableLots(Builder $query, ?string $today = null): Builder
+    {
+        $today ??= now()->toDateString();
+
+        return $query
+            ->where('quantity_remaining', '>', 0)
+            ->where(function (Builder $exp) use ($today) {
+                $exp->whereNull('expiration_date')
+                    ->orWhereDate('expiration_date', '>=', $today);
+            });
+    }
+
+    public function sumSellableRemaining(int $productId, ?int $variantId = null, bool $simpleLotsOnly = false): float
+    {
+        return round((float) $this->sellableLotsQuery($productId, $variantId, $simpleLotsOnly)
+            ->sum('quantity_remaining'), 3);
+    }
+
+    public function soonestSellableExpiry(int $productId, ?int $variantId = null, bool $simpleLotsOnly = false): mixed
+    {
+        return $this->sellableLotsQuery($productId, $variantId, $simpleLotsOnly)
+            ->whereNotNull('expiration_date')
+            ->orderBy('expiration_date')
+            ->value('expiration_date');
+    }
+
+    public function soonestRemainingExpiry(int $productId, ?int $variantId = null, bool $simpleLotsOnly = false): mixed
+    {
+        $query = StockLot::query()
+            ->where('product_id', $productId)
+            ->where('quantity_remaining', '>', 0);
+
+        if ($variantId !== null) {
+            $query->where('product_variant_id', $variantId);
+        } elseif ($simpleLotsOnly) {
+            $query->whereNull('product_variant_id');
+        }
+
+        return $query
+            ->whereNotNull('expiration_date')
+            ->orderBy('expiration_date')
+            ->value('expiration_date');
+    }
+
+    private function sellableLotsQuery(int $productId, ?int $variantId = null, bool $simpleLotsOnly = false): Builder
+    {
+        $query = StockLot::query()->where('product_id', $productId);
+
+        if ($variantId !== null) {
+            $query->where('product_variant_id', $variantId);
+        } elseif ($simpleLotsOnly) {
+            $query->whereNull('product_variant_id');
+        }
+
+        return $this->constrainSellableLots($query);
+    }
+
     public function refreshProductStockMeta(Product $product, ?ProductVariant $variant = null): Product
     {
         $product->refresh();
@@ -236,29 +294,21 @@ class LotService
                 ->sum('stock_quantity');
 
             $product->stock_quantity = round($total, 3);
+            $product->expiration_date = $product->stock_quantity > 0.0001
+                ? $this->soonestSellableExpiry($product->id)
+                : $this->soonestRemainingExpiry($product->id);
+
             $product->save();
 
             return $product->fresh();
         }
 
-        $remaining = (float) StockLot::query()
-            ->where('product_id', $product->id)
-            ->whereNull('product_variant_id')
-            ->sum('quantity_remaining');
+        $remaining = $this->sumSellableRemaining($product->id, simpleLotsOnly: true);
 
-        $soonestExpiry = StockLot::query()
-            ->where('product_id', $product->id)
-            ->whereNull('product_variant_id')
-            ->where('quantity_remaining', '>', 0)
-            ->whereNotNull('expiration_date')
-            ->orderBy('expiration_date')
-            ->value('expiration_date');
-
-        $product->stock_quantity = round($remaining, 3);
-
-        if ($remaining > 0.0001) {
-            $product->expiration_date = $soonestExpiry;
-        }
+        $product->stock_quantity = $remaining;
+        $product->expiration_date = $remaining > 0.0001
+            ? $this->soonestSellableExpiry($product->id, simpleLotsOnly: true)
+            : $this->soonestRemainingExpiry($product->id, simpleLotsOnly: true);
 
         $product->save();
 
@@ -267,11 +317,10 @@ class LotService
 
     public function refreshVariantStockFromLots(ProductVariant $variant): ProductVariant
     {
-        $remaining = (float) StockLot::query()
-            ->where('product_variant_id', $variant->id)
-            ->sum('quantity_remaining');
-
-        $variant->stock_quantity = round($remaining, 3);
+        $variant->stock_quantity = $this->sumSellableRemaining(
+            (int) $variant->product_id,
+            (int) $variant->id,
+        );
         $variant->save();
 
         return $variant->fresh();

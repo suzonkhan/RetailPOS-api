@@ -76,6 +76,11 @@ class ProductVariant extends Model
         return $this->hasMany(SaleItem::class);
     }
 
+    public function stockLots(): HasMany
+    {
+        return $this->hasMany(StockLot::class);
+    }
+
     public function resolvedSellingPrice(): float
     {
         if ($this->selling_price !== null) {

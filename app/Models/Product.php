@@ -109,4 +109,9 @@ class Product extends Model
     {
         return $this->hasMany(ProductVariant::class)->where('is_active', true);
     }
+
+    public function stockLots(): HasMany
+    {
+        return $this->hasMany(StockLot::class);
+    }
 }

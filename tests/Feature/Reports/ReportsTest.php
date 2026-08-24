@@ -262,6 +262,50 @@ class ReportsTest extends TestCase
             ]);
     }
 
+    public function test_sale_returns_report(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 100,
+            'stock_quantity' => 10,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+        $cashId = $this->createPaymentMethod('Cash');
+
+        $sale = $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 2],
+            ],
+            'payments' => [
+                ['payment_method_id' => $cashId, 'amount' => 200],
+            ],
+        ])->assertCreated();
+
+        $saleId = $sale->json('id');
+        $saleItemId = $sale->json('items.0.id');
+
+        $this->postJson("/api/v1/sales/{$saleId}/returns", [
+            'items' => [
+                ['sale_item_id' => $saleItemId, 'quantity' => 1],
+            ],
+        ])->assertCreated();
+
+        $from = now()->startOfMonth()->toDateString();
+        $to = now()->toDateString();
+
+        $this->getJson("/api/v1/reports/sale-returns?from={$from}&to={$to}")
+            ->assertOk()
+            ->assertJsonPath('return_count', 1)
+            ->assertJsonPath('returns_total', 100)
+            ->assertJsonPath('data.0.sale_id', $saleId)
+            ->assertJsonPath('data.0.items_returned', 1)
+            ->assertJsonPath('data.0.total', 100);
+    }
+
     public function test_profit_summary_includes_expenses_and_net_profit(): void
     {
         Sanctum::actingAs($this->owner);

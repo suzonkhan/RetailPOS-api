@@ -193,4 +193,15 @@ class ReportController extends Controller
             )
         );
     }
+
+    public function saleReturns(ReportDateRangeRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        $range = $this->scope->resolveDateRange($request->validated(), $user);
+        $store = $this->scope->storeFor($user);
+
+        return response()->json(
+            $this->reports->saleReturnsReport($store, $range['from'], $range['to'])
+        );
+    }
 }
