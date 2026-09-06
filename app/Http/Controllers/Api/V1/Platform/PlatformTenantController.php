@@ -25,14 +25,7 @@ class PlatformTenantController extends Controller
             request()->only(['search', 'status', 'page', 'per_page'])
         );
 
-        return PlatformTenantListResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return PlatformTenantListResource::collection($paginator);
     }
 
     public function store(CreatePlatformTenantRequest $request): JsonResponse

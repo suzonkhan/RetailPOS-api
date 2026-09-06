@@ -33,14 +33,7 @@ class ProductController extends Controller
 
         $paginator = $this->productService->listForUser(request()->user(), $filters);
 
-        return ProductResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return ProductResource::collection($paginator);
     }
 
     public function store(StoreProductRequest $request): JsonResponse

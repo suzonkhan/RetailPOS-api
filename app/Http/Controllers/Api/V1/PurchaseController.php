@@ -23,14 +23,7 @@ class PurchaseController extends Controller
             request()->only(['supplier_id', 'from', 'to', 'search', 'per_page', 'page'])
         );
 
-        return PurchaseResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return PurchaseResource::collection($paginator);
     }
 
     public function store(StorePurchaseRequest $request): JsonResponse

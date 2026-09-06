@@ -9,6 +9,7 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\Sales\SaleService;
 use App\Services\Sales\SalesScopeService;
+use App\Support\PaginationMeta;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -44,18 +45,14 @@ class SaleController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        return SaleResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
+        return SaleResource::collection($paginator)->additional(
+            PaginationMeta::extra([
                 'users' => $users->map(fn (User $u) => [
                     'id' => $u->id,
                     'name' => $u->name,
                 ])->values(),
-            ],
-        ]);
+            ])
+        );
     }
 
     public function store(StoreSaleRequest $request): JsonResponse

@@ -8,6 +8,7 @@ use App\Http\Requests\Expenses\UpdateExpenseRequest;
 use App\Http\Resources\ExpenseResource;
 use App\Models\Expense;
 use App\Services\Expenses\ExpenseService;
+use App\Support\PaginationMeta;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -34,15 +35,11 @@ class ExpenseController extends Controller
         $paginator = $this->expenses->listForUser(request()->user(), $filters);
         $totalAmount = $this->expenses->totalAmountForUser(request()->user(), $filters);
 
-        return ExpenseResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
+        return ExpenseResource::collection($paginator)->additional(
+            PaginationMeta::extra([
                 'total_amount' => (float) $totalAmount,
-            ],
-        ]);
+            ])
+        );
     }
 
     public function store(StoreExpenseRequest $request): JsonResponse

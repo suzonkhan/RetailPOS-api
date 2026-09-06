@@ -35,14 +35,7 @@ class InventoryController extends Controller
             ])
         );
 
-        return StockLotResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return StockLotResource::collection($paginator);
     }
 
     public function adjust(StoreStockAdjustmentRequest $request): JsonResponse

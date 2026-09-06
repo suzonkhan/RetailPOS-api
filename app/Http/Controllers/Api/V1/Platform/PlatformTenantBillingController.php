@@ -23,14 +23,7 @@ class PlatformTenantBillingController extends Controller
             request()->only(['payment_status', 'page', 'per_page']),
         );
 
-        return PlatformTenantBillingResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return PlatformTenantBillingResource::collection($paginator);
     }
 
     public function approve(Tenant $tenant, SubscriptionInvoice $invoice): JsonResponse

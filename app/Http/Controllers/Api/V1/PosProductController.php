@@ -25,13 +25,6 @@ class PosProductController extends Controller
             ])
         );
 
-        return ProductResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return ProductResource::collection($paginator);
     }
 }

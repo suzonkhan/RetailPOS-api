@@ -11,6 +11,7 @@ use App\Http\Resources\ExpenseResource;
 use App\Http\Resources\StaffResource;
 use App\Models\Staff;
 use App\Services\Staff\StaffService;
+use App\Support\PaginationMeta;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
@@ -76,15 +77,11 @@ class StaffController extends Controller
         $paginator = $this->staff->listPayments(request()->user(), $staff, $filters);
         $totalAmount = $this->staff->paymentsTotal(request()->user(), $staff, $filters);
 
-        return ExpenseResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
+        return ExpenseResource::collection($paginator)->additional(
+            PaginationMeta::extra([
                 'total_amount' => (float) $totalAmount,
-            ],
-        ]);
+            ])
+        );
     }
 
     public function storePayment(StoreStaffPaymentRequest $request, Staff $staff): JsonResponse

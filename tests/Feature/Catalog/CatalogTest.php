@@ -281,6 +281,35 @@ class CatalogTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
+    public function test_product_list_pagination_meta_is_scalar_and_pages(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory('Paged');
+        foreach (['Alpha Page', 'Beta Page', 'Gamma Page'] as $name) {
+            $this->createProduct($categoryId, ['name' => $name]);
+        }
+
+        $page1 = $this->getJson('/api/v1/products?per_page=2&page=1')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('meta.current_page', 1)
+            ->assertJsonPath('meta.per_page', 2)
+            ->assertJsonPath('meta.total', 3)
+            ->assertJsonPath('meta.last_page', 2);
+
+        $this->assertIsInt($page1->json('meta.current_page'));
+        $this->assertIsInt($page1->json('meta.per_page'));
+        $this->assertIsInt($page1->json('meta.total'));
+        $this->assertIsInt($page1->json('meta.last_page'));
+
+        $this->getJson('/api/v1/products?per_page=2&page=2')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.current_page', 2)
+            ->assertJsonPath('meta.last_page', 2);
+    }
+
     public function test_plan_limits_reject_category_and_product_create(): void
     {
         Sanctum::actingAs($this->owner);

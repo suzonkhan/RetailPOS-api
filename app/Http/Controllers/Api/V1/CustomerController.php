@@ -27,14 +27,7 @@ class CustomerController extends Controller
             request()->only(['search', 'per_page', 'page', 'due'])
         );
 
-        return CustomerResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return CustomerResource::collection($paginator);
     }
 
     public function store(StoreCustomerRequest $request): JsonResponse

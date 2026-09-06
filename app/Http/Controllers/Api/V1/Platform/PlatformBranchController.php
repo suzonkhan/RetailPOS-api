@@ -19,13 +19,6 @@ class PlatformBranchController extends Controller
             request()->only(['search', 'status', 'plan_slug', 'page', 'per_page']),
         );
 
-        return PlatformBranchListResource::collection($paginator)->additional([
-            'meta' => [
-                'current_page' => $paginator->currentPage(),
-                'per_page' => $paginator->perPage(),
-                'total' => $paginator->total(),
-                'last_page' => $paginator->lastPage(),
-            ],
-        ]);
+        return PlatformBranchListResource::collection($paginator);
     }
 }
