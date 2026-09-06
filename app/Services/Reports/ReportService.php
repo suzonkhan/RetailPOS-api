@@ -806,6 +806,9 @@ class ReportService
         $grossRevenue = (float) (clone $sales)->sum('total');
         $returnsTotal = $this->returnsTotalInRange($store, $from, $to);
 
+        $saleItems = $this->table(SaleItem::class);
+        $saleReturnItems = $this->table(SaleReturnItem::class);
+
         $cogsSold = (float) SaleItem::query()
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.store_id', $store->id)
@@ -816,7 +819,7 @@ class ReportService
             ])
             ->whereNull('sales.deleted_at')
             ->whereBetween('sales.created_at', [$from, $to])
-            ->selectRaw('COALESCE(SUM(sale_items.quantity * COALESCE(sale_items.unit_cost, 0)), 0) as cogs')
+            ->selectRaw("COALESCE(SUM({$saleItems}.quantity * COALESCE({$saleItems}.unit_cost, 0)), 0) as cogs")
             ->value('cogs');
 
         $cogsReturned = (float) SaleReturnItem::query()
@@ -825,7 +828,7 @@ class ReportService
             ->where('sale_returns.store_id', $store->id)
             ->whereNull('sale_returns.deleted_at')
             ->whereBetween('sale_returns.created_at', [$from, $to])
-            ->selectRaw('COALESCE(SUM(sale_return_items.quantity * COALESCE(sale_items.unit_cost, 0)), 0) as cogs')
+            ->selectRaw("COALESCE(SUM({$saleReturnItems}.quantity * COALESCE({$saleItems}.unit_cost, 0)), 0) as cogs")
             ->value('cogs');
 
         $cogs = round($cogsSold - $cogsReturned, 2);
