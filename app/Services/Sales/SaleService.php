@@ -280,6 +280,12 @@ class SaleService
         foreach ($data['payments'] as $paymentData) {
             $method = $paymentMethods->get($paymentData['payment_method_id']);
 
+            if (! $method->is_active) {
+                throw ValidationException::withMessages([
+                    'payments' => ["Payment method is inactive: {$method->name}."],
+                ]);
+            }
+
             if ($method->is_credit && $customerId === null) {
                 throw ValidationException::withMessages([
                     'customer_id' => ['Customer is required when using a credit/due payment method.'],

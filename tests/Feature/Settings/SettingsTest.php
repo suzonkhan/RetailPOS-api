@@ -190,6 +190,24 @@ class SettingsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_owner_list_includes_inactive_payment_methods(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $inactive = $this->postJson('/api/v1/payment-methods', [
+            'name' => 'Inactive Card',
+            'is_active' => false,
+        ])->assertCreated();
+
+        $this->getJson('/api/v1/payment-methods')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $inactive->json('id'),
+                'name' => 'Inactive Card',
+                'is_active' => false,
+            ]);
+    }
+
     public function test_owner_cannot_access_another_tenants_payment_method(): void
     {
         Sanctum::actingAs($this->owner);

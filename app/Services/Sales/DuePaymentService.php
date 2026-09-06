@@ -61,6 +61,12 @@ class DuePaymentService
                     ]);
                 }
 
+                if (! $method->is_active) {
+                    throw ValidationException::withMessages([
+                        'payment_method_id' => ['Inactive payment methods cannot be used to collect dues.'],
+                    ]);
+                }
+
                 if ($method->is_credit) {
                     throw ValidationException::withMessages([
                         'payment_method_id' => ['Credit/due payment methods cannot be used to collect dues.'],

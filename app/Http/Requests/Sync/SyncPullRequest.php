@@ -15,6 +15,8 @@ class SyncPullRequest extends FormRequest
         'suppliers',
         'brands',
         'variation_attributes',
+        'uoms',
+        'uom_conversions',
         'products',
         'customers',
         'stock',

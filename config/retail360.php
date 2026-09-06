@@ -37,6 +37,11 @@ return [
         ['code' => 'set', 'label' => 'Set', 'fractional' => false],
     ],
 
+    'uom_conversions' => [
+        ['from' => 'kg', 'to' => 'g', 'factor' => 1000],
+        ['from' => 'L', 'to' => 'ml', 'factor' => 1000],
+    ],
+
     'bkash' => [
         'app_key' => env('BKASH_APP_KEY'),
         'app_secret' => env('BKASH_APP_SECRET'),

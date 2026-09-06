@@ -664,6 +664,72 @@ class SalesTest extends TestCase
             ->assertJsonValidationErrors(['payment_method_id']);
     }
 
+    public function test_sale_rejects_inactive_payment_method(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 100,
+            'stock_quantity' => 5,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+
+        $inactiveId = (int) $this->postJson('/api/v1/payment-methods', [
+            'name' => 'Old Card',
+            'is_active' => false,
+        ])->assertCreated()->json('id');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $inactiveId, 'amount' => 100],
+            ],
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['payments']);
+    }
+
+    public function test_due_payment_rejects_inactive_payment_method(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $customerId = $this->createCustomer();
+        $categoryId = $this->createCategory();
+        $productId = $this->createProduct($categoryId, [
+            'selling_price' => 100,
+            'stock_quantity' => 5,
+            'vat_rate' => 0,
+            'vat_type' => 'percent',
+        ]);
+
+        $dueMethodId = $this->createPaymentMethod('Due', isCredit: true);
+        $inactiveId = (int) $this->postJson('/api/v1/payment-methods', [
+            'name' => 'Old Card',
+            'is_active' => false,
+        ])->assertCreated()->json('id');
+
+        $this->postJson('/api/v1/sales', [
+            'client_uuid' => (string) Str::uuid(),
+            'customer_id' => $customerId,
+            'items' => [
+                ['product_id' => $productId, 'quantity' => 1],
+            ],
+            'payments' => [
+                ['payment_method_id' => $dueMethodId, 'amount' => 100],
+            ],
+        ])->assertCreated();
+
+        $this->postJson("/api/v1/customers/{$customerId}/due-payments", [
+            'amount' => 50,
+            'payment_method_id' => $inactiveId,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['payment_method_id']);
+    }
+
     public function test_staff_can_use_pos_and_customers(): void
     {
         $staff = $this->createTenantUser('staff');

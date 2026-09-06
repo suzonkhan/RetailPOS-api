@@ -4,7 +4,6 @@ namespace App\Http\Requests\Catalog;
 
 use App\Http\Requests\Catalog\Concerns\ValidatesCatalogRelations;
 use App\Services\Catalog\CatalogScopeService;
-use App\Support\Uom;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -36,7 +35,14 @@ class StoreProductRequest extends FormRequest
             'selling_price' => ['sometimes', 'numeric', 'min:0'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
             'min_stock_quantity' => ['nullable', 'numeric', 'min:0'],
-            'uom' => ['required', 'string', 'max:16', Rule::in(Uom::codes())],
+            'uom' => [
+                'required',
+                'string',
+                'max:16',
+                Rule::exists('store_uoms', 'code')
+                    ->where('store_id', $storeId)
+                    ->where('is_active', true),
+            ],
             'is_active' => ['sometimes', 'boolean'],
             'is_negotiable' => ['sometimes', 'boolean'],
             'ask_qty_on_add' => ['sometimes', 'boolean'],

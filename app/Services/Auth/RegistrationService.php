@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Models\StoreSetting;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Catalog\UomCatalogService;
 use App\Services\Plans\TrialPlanService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -15,6 +16,7 @@ class RegistrationService
 {
     public function __construct(
         private readonly TrialPlanService $trialPlanService,
+        private readonly UomCatalogService $uomCatalog,
     ) {}
 
     public function register(array $data): User
@@ -56,6 +58,8 @@ class RegistrationService
                 'sort_order' => 0,
                 'requires_reference' => false,
             ]);
+
+            $this->uomCatalog->seedDefaults($store);
 
             $user = User::query()->create([
                 'name' => $ownerName,

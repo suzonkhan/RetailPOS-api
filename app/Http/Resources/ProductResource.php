@@ -4,7 +4,7 @@ namespace App\Http\Resources;
 
 use App\Http\Resources\ProductVariantResource;
 use App\Models\Product;
-use App\Support\Uom;
+use App\Services\Catalog\UomCatalogService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -54,8 +54,8 @@ class ProductResource extends JsonResource
                 : null,
             'expiration_date' => $this->expiration_date?->format('Y-m-d'),
             'uom' => $this->uom ?? 'pcs',
-            'uom_label' => Uom::label($this->uom ?? 'pcs'),
-            'fractional_qty' => Uom::isFractional($this->uom ?? 'pcs'),
+            'uom_label' => $this->resolveUomLabel($request),
+            'fractional_qty' => $this->resolveFractionalQty($request),
             'is_low_stock' => $this->manage_inventory
                 && $this->min_stock_quantity !== null
                 && (float) $this->stock_quantity <= (float) $this->min_stock_quantity,
@@ -93,5 +93,19 @@ class ProductResource extends JsonResource
             'updated_at' => $this->updated_at?->toIso8601String(),
             'deleted_at' => $this->deleted_at?->toIso8601String(),
         ];
+    }
+
+    private function resolveUomLabel(Request $request): string
+    {
+        $code = $this->uom ?? 'pcs';
+
+        return app(UomCatalogService::class)->labelForStoreId((int) $this->store_id, $code);
+    }
+
+    private function resolveFractionalQty(Request $request): bool
+    {
+        $code = $this->uom ?? 'pcs';
+
+        return app(UomCatalogService::class)->isFractionalForStoreId((int) $this->store_id, $code);
     }
 }

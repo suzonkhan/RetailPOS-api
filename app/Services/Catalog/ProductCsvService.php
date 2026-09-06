@@ -323,7 +323,13 @@ class ProductCsvService
             'brand_id' => ['nullable', 'integer'],
             'selling_price' => ['nullable', 'numeric', 'min:0'],
             'cost_price' => ['nullable', 'numeric', 'min:0'],
-            'uom' => ['required', 'string', Rule::in(Uom::codes())],
+            'uom' => [
+                'required',
+                'string',
+                Rule::exists('store_uoms', 'code')
+                    ->where('store_id', $store->id)
+                    ->where('is_active', true),
+            ],
             'vat_rate' => ['nullable', 'numeric', 'min:0'],
             'vat_type' => ['nullable', 'string', Rule::in($vatTypes), 'required_with:vat_rate'],
             'min_stock_quantity' => ['nullable', 'numeric', 'min:0'],

@@ -7,7 +7,8 @@ use App\Http\Resources\CategoryResource;
 use App\Http\Resources\CustomerResource;
 use App\Http\Resources\PaymentMethodResource;
 use App\Http\Resources\ProductResource;
-use App\Http\Resources\SupplierResource;
+use App\Http\Resources\StoreUomConversionResource;
+use App\Http\Resources\StoreUomResource;
 use App\Http\Resources\SyncSettingsResource;
 use App\Http\Resources\VariationAttributeResource;
 use App\Models\Brand;
@@ -17,6 +18,8 @@ use App\Models\Device;
 use App\Models\PaymentMethod;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\StoreUom;
+use App\Models\StoreUomConversion;
 use App\Models\Supplier;
 use App\Models\SyncBatch;
 use App\Models\SyncLog;
@@ -54,6 +57,8 @@ class SyncPullService
                 'suppliers',
                 'brands',
                 'variation_attributes',
+                'uoms',
+                'uom_conversions',
                 'products',
                 'customers',
                 'stock',
@@ -146,6 +151,25 @@ class SyncPullService
                     ->get();
             }
 
+            $uoms = collect();
+            if (isset($includeSet['uoms'])) {
+                $uoms = StoreUom::query()
+                    ->where('store_id', $storeId)
+                    ->where('updated_at', '>', $since)
+                    ->orderBy('sort_order')
+                    ->get();
+            }
+
+            $uomConversions = collect();
+            if (isset($includeSet['uom_conversions'])) {
+                $uomConversions = StoreUomConversion::query()
+                    ->where('store_id', $storeId)
+                    ->where('updated_at', '>', $since)
+                    ->with(['fromUom', 'toUom'])
+                    ->orderBy('id')
+                    ->get();
+            }
+
             $customers = collect();
             if (isset($includeSet['customers'])) {
                 $customers = Customer::query()
@@ -186,6 +210,12 @@ class SyncPullService
             if (isset($includeSet['variation_attributes'])) {
                 $payload['variation_attributes'] = VariationAttributeResource::collection($variationAttributes)->resolve();
             }
+            if (isset($includeSet['uoms'])) {
+                $payload['uoms'] = StoreUomResource::collection($uoms)->resolve();
+            }
+            if (isset($includeSet['uom_conversions'])) {
+                $payload['uom_conversions'] = StoreUomConversionResource::collection($uomConversions)->resolve();
+            }
             if (isset($includeSet['products'])) {
                 $payload['products'] = ProductResource::collection($products)->resolve();
             }
@@ -202,6 +232,8 @@ class SyncPullService
                 + $suppliers->count()
                 + $brands->count()
                 + $variationAttributes->count()
+                + $uoms->count()
+                + $uomConversions->count()
                 + $products->count()
                 + $customers->count()
                 + count($stockRows);
@@ -225,6 +257,8 @@ class SyncPullService
                         'suppliers' => $suppliers->count(),
                         'brands' => $brands->count(),
                         'variation_attributes' => $variationAttributes->count(),
+                        'uoms' => $uoms->count(),
+                        'uom_conversions' => $uomConversions->count(),
                         'products' => $products->count(),
                         'customers' => $customers->count(),
                         'stock' => count($stockRows),

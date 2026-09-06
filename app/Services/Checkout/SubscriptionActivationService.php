@@ -11,10 +11,14 @@ use App\Models\StoreSetting;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
 use App\Models\Tenant;
+use App\Services\Catalog\UomCatalogService;
 use Illuminate\Support\Facades\DB;
 
 class SubscriptionActivationService
 {
+    public function __construct(
+        private readonly UomCatalogService $uomCatalog,
+    ) {}
     public function activateFromInvoice(SubscriptionInvoice $invoice, ?BkashPayment $payment = null): Store
     {
         if ($invoice->status === SubscriptionInvoice::STATUS_PAID && $invoice->store_id !== null) {
@@ -107,6 +111,8 @@ class SubscriptionActivationService
             'sort_order' => 0,
             'requires_reference' => false,
         ]);
+
+        $this->uomCatalog->seedDefaults($store);
 
         return $store;
     }

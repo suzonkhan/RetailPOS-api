@@ -19,7 +19,8 @@ use App\Http\Controllers\Api\V1\DeviceController;
 use App\Http\Controllers\Api\V1\DuePaymentController;
 use App\Http\Controllers\Api\V1\ExpenseCategoryController;
 use App\Http\Controllers\Api\V1\ExpenseController;
-use App\Http\Controllers\Api\V1\StaffController;
+use App\Http\Controllers\Api\V1\StoreUomController;
+use App\Http\Controllers\Api\V1\StoreUomConversionController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\PaymentMethodController;
 use App\Http\Controllers\Api\V1\PlanController;
@@ -112,6 +113,8 @@ Route::prefix('v1')->group(function () {
             Route::apiResource('categories', CategoryController::class);
             Route::apiResource('suppliers', SupplierController::class);
             Route::apiResource('brands', BrandController::class);
+            Route::apiResource('uoms', StoreUomController::class);
+            Route::apiResource('uom-conversions', StoreUomConversionController::class);
             Route::apiResource('variation-attributes', VariationAttributeController::class);
             Route::post('variation-attributes/{variation_attribute}/values', [VariationAttributeController::class, 'storeValue']);
             Route::put('variation-attribute-values/{variationAttributeValue}', [VariationAttributeController::class, 'updateValue']);
