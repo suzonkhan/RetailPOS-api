@@ -9,6 +9,7 @@ use App\Http\Resources\PaymentMethodResource;
 use App\Http\Resources\ProductResource;
 use App\Http\Resources\StoreUomConversionResource;
 use App\Http\Resources\StoreUomResource;
+use App\Http\Resources\SupplierResource;
 use App\Http\Resources\SyncSettingsResource;
 use App\Http\Resources\VariationAttributeResource;
 use App\Models\Brand;
@@ -28,7 +29,6 @@ use App\Models\VariationAttribute;
 use App\Services\Sales\SalesScopeService;
 use App\Services\Settings\TenantSettingsService;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class SyncPullService
 {
@@ -67,10 +67,9 @@ class SyncPullService
 
         $includeSet = array_fill_keys($include, true);
 
-        return DB::transaction(function () use ($user, $device, $since, $includeSet, $includeImages) {
-            $store = $this->scope->resolveStore($user);
-            $storeId = $store->id;
-            $tenantId = $user->tenant_id;
+        $store = $this->scope->resolveStore($user);
+        $storeId = $store->id;
+        $tenantId = $user->tenant_id;
 
             $settingsRows = [];
             if (isset($includeSet['settings'])) {
@@ -136,6 +135,9 @@ class SyncPullService
                     ->where('updated_at', '>', $since)
                     ->withTrashed()
                     ->with($with)
+                    ->withCount([
+                        'variants as active_variants_count' => fn ($q) => $q->where('is_active', true),
+                    ])
                     ->orderBy('name')
                     ->get();
             }
@@ -277,7 +279,6 @@ class SyncPullService
             $this->devices->touchSync($device);
 
             return $payload;
-        });
     }
 
     /**

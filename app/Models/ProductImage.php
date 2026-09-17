@@ -56,6 +56,14 @@ class ProductImage extends Model
 
     public function url(): ?string
     {
-        return Storage::disk($this->disk)->url($this->path);
+        if ($this->path === null || $this->path === '') {
+            return null;
+        }
+
+        try {
+            return Storage::disk($this->disk ?: 'public')->url($this->path);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
