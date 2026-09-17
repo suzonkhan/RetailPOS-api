@@ -203,6 +203,71 @@ class SyncTest extends TestCase
         $this->assertEquals(1, StockMovement::query()->where('type', 'sale')->count());
     }
 
+    public function test_push_sale_keeps_discount_amount_and_accepts_discounted_payment(): void
+    {
+        Sanctum::actingAs($this->owner);
+
+        $categoryId = $this->createCategory();
+        $product = $this->postJson('/api/v1/products', [
+            'name' => 'Discount Sync Product',
+            'category_id' => $categoryId,
+            'selling_price' => 110,
+            'uom' => 'pcs',
+            'manage_inventory' => true,
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/stock-adjustments', [
+            'product_id' => $product->json('id'),
+            'quantity_delta' => 5,
+            'unit_cost' => 0,
+            'reason' => 'Test seed',
+        ])->assertCreated();
+
+        $cash = PaymentMethod::query()
+            ->where('tenant_id', $this->owner->tenant_id)
+            ->where('name', 'Cash')
+            ->first();
+
+        if ($cash === null) {
+            $cash = $this->postJson('/api/v1/payment-methods', ['name' => 'Cash Discount'])->assertCreated();
+            $cashUuid = $cash->json('uuid');
+        } else {
+            $cashUuid = $cash->uuid;
+        }
+
+        $clientUuid = (string) Str::uuid();
+
+        $this->postJson('/api/v1/sync/push', [
+            'device_id' => $this->deviceId,
+            'device_name' => 'POS Windows',
+            'entities' => [
+                'sales' => [
+                    [
+                        'client_uuid' => $clientUuid,
+                        'discount_amount' => 30,
+                        'change_amount' => 0,
+                        'items' => [
+                            ['product_uuid' => $product->json('uuid'), 'quantity' => 1],
+                        ],
+                        'payments' => [
+                            ['payment_method_uuid' => $cashUuid, 'amount' => 80],
+                        ],
+                    ],
+                ],
+                'customers' => [],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('results.sales.accepted', 1)
+            ->assertJsonPath('results.sales.rejected', 0);
+
+        $this->assertDatabaseHas('sales', [
+            'client_uuid' => $clientUuid,
+            'subtotal' => 110,
+            'discount_amount' => 30,
+            'total' => 80,
+        ]);
+    }
+
     public function test_push_customer_create_and_update_by_uuid(): void
     {
         Sanctum::actingAs($this->owner);

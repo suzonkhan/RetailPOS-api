@@ -34,6 +34,8 @@ class SyncPushRequest extends FormRequest
             'entities.sales.*.payments.*.payment_method_uuid' => ['sometimes', 'uuid'],
             'entities.sales.*.payments.*.amount' => ['required', 'numeric', 'min:0.01'],
             'entities.sales.*.payments.*.reference' => ['nullable', 'string', 'max:255'],
+            'entities.sales.*.change_amount' => ['sometimes', 'numeric', 'min:0'],
+            'entities.sales.*.discount_amount' => ['sometimes', 'numeric', 'min:0'],
             'entities.customers' => ['sometimes', 'array'],
             'entities.customers.*.uuid' => ['required', 'uuid'],
             'entities.customers.*.name' => ['required', 'string', 'max:255'],
